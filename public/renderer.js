@@ -224,6 +224,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       // Request microphone access
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       
+      // Set up audio analyzer for visualizing audio levels
+      setupAudioAnalyzer(stream);
+      
       // Create new media recorder with webm format
       mediaRecorder = new MediaRecorder(stream, {
         mimeType: 'audio/webm' // Explicitly use webm format
@@ -257,6 +260,59 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
   
+  // Audio analyzer variables
+  let audioContext;
+  let analyzer;
+  let analyzerInterval;
+  
+  function setupAudioAnalyzer(stream) {
+    // Clean up any existing analyzer
+    if (analyzerInterval) {
+      clearInterval(analyzerInterval);
+      analyzerInterval = null;
+    }
+    
+    try {
+      // Create audio context and analyzer
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const source = audioContext.createMediaStreamSource(stream);
+      analyzer = audioContext.createAnalyser();
+      analyzer.fftSize = 256;
+      source.connect(analyzer);
+      
+      // Set up data array for analyzer
+      const bufferLength = analyzer.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+      
+      // Function to analyze volume level
+      const analyzeVolume = () => {
+        if (!isRecording) return;
+        
+        // Get frequency data
+        analyzer.getByteFrequencyData(dataArray);
+        
+        // Calculate average volume (0-255)
+        let sum = 0;
+        for (let i = 0; i < bufferLength; i++) {
+          sum += dataArray[i];
+        }
+        const average = sum / bufferLength;
+        
+        // Normalize to 0-1 range
+        const normalizedVolume = Math.min(1, average / 128);
+        
+        // Send to main process for overlay window
+        window.electronAPI.sendAudioLevel?.(normalizedVolume);
+      };
+      
+      // Start analyzing at interval
+      analyzerInterval = setInterval(analyzeVolume, 100);
+      
+    } catch (error) {
+      console.error('Error setting up audio analyzer:', error);
+    }
+  }
+  
   function stopRecording() {
     if (!isRecording || !mediaRecorder) return;
     
@@ -264,6 +320,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (recordingTimer) {
       clearTimeout(recordingTimer);
       recordingTimer = null;
+    }
+    
+    // Stop audio analyzer
+    if (analyzerInterval) {
+      clearInterval(analyzerInterval);
+      analyzerInterval = null;
+    }
+    
+    // Close audio context to free up resources
+    if (audioContext && audioContext.state !== 'closed') {
+      audioContext.close().catch(console.error);
     }
     
     // Stop recording
@@ -353,6 +420,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (isRecordingShortcut) {
       window.removeEventListener('keydown', recordKeyDown);
       window.removeEventListener('keyup', recordKeyUp);
+    }
+    
+    // Stop audio analyzer
+    if (analyzerInterval) {
+      clearInterval(analyzerInterval);
+      analyzerInterval = null;
+    }
+    
+    // Close audio context to free up resources
+    if (audioContext && audioContext.state !== 'closed') {
+      audioContext.close().catch(console.error);
     }
     
     // Stop recording if active

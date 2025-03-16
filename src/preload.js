@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Recording and transcription
   transcribeAudio: (base64Audio) => ipcRenderer.invoke('transcribe-audio', base64Audio),
   updateRecordingState: (isRecording) => ipcRenderer.invoke('update-recording-state', isRecording),
+  sendAudioLevel: (level) => ipcRenderer.invoke('audio-level', level),
   
   // Events from main to renderer
   onToggleRecording: (callback) => {
@@ -33,5 +34,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onShortcutUpdated: (callback) => {
     ipcRenderer.on('shortcut-updated', (_, shortcut) => callback(shortcut));
     return () => ipcRenderer.removeAllListeners('shortcut-updated');
+  },
+  onAudioLevel: (callback) => {
+    ipcRenderer.on('audio-level', (_, level) => callback(level));
+    return () => ipcRenderer.removeAllListeners('audio-level');
   }
 });

@@ -13,6 +13,7 @@ const store = new Store();
 // App state variables
 let tray = null;
 let mainWindow = null;
+let overlayWindow = null;
 let isRecording = false;
 let apiKey = store.get('apiKey');
 let globalShortcutKey = store.get('globalShortcut') || 'CommandOrControl+Shift+Space';
@@ -44,6 +45,58 @@ function createWindow() {
   if (process.argv.includes('--dev')) {
     mainWindow.webContents.openDevTools();
   }
+}
+
+// Function to create floating overlay window for recording visualization
+function createOverlayWindow() {
+  // If window already exists, just show it
+  if (overlayWindow) {
+    overlayWindow.show();
+    return;
+  }
+  
+  // Get the primary display to center the window
+  const { screen } = require('electron');
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width, height } = primaryDisplay.workAreaSize;
+  
+  // Create a transparent, frameless window
+  overlayWindow = new BrowserWindow({
+    width: 300,
+    height: 300,
+    x: Math.floor(width / 2 - 150),  // Center horizontally
+    y: Math.floor(height / 2 - 150),  // Center vertically
+    frame: false,
+    transparent: true,
+    resizable: false,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    show: false,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    }
+  });
+  
+  // Load the overlay HTML
+  overlayWindow.loadFile(path.join(__dirname, '../public/overlay.html'));
+  
+  // Hide instead of close when the close button is clicked
+  overlayWindow.on('close', (event) => {
+    event.preventDefault();
+    overlayWindow.hide();
+  });
+  
+  // Show dev tools in development mode
+  if (process.argv.includes('--dev')) {
+    overlayWindow.webContents.openDevTools({ mode: 'detach' });
+  }
+  
+  // When the window is ready, show it with a nice fade-in
+  overlayWindow.once('ready-to-show', () => {
+    overlayWindow.show();
+  });
 }
 
 function createTray() {
@@ -199,10 +252,21 @@ async function transcribeAudio(base64Audio) {
   }
 }
 
-// This function now just passes the command to the renderer process
+// This function now toggles recording and manages the overlay
 function toggleRecording() {
+  // If this was triggered by the global shortcut, create/show the overlay window
+  if (!mainWindow.isFocused()) {
+    createOverlayWindow();
+  }
+  
+  // Notify the main window to toggle recording
   if (mainWindow) {
     mainWindow.webContents.send('toggle-recording');
+  }
+  
+  // Notify the overlay window (if it exists) about the recording toggle
+  if (overlayWindow && overlayWindow.isVisible()) {
+    overlayWindow.webContents.send('toggle-recording');
   }
 }
 
@@ -306,6 +370,14 @@ ipcMain.handle('set-global-shortcut', async (event, shortcutKey) => {
 // Handler for getting the current global shortcut
 ipcMain.handle('get-global-shortcut', () => {
   return globalShortcutKey;
+});
+
+// Handler for receiving audio levels and forwarding to overlay window
+ipcMain.handle('audio-level', (event, level) => {
+  if (overlayWindow && overlayWindow.isVisible()) {
+    overlayWindow.webContents.send('audio-level', level);
+  }
+  return true;
 });
 
 // Function to register the global shortcut
