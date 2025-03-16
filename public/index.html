@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Whisper Transcriber</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Whisper Transcriber</h1>
+
+    <div class="section">
+      <h2>API Configuration</h2>
+      <div class="input-group">
+        <label for="api-key">Groq API Key:</label>
+        <input type="password" id="api-key" placeholder="Enter your Groq API key">
+        <button id="save-api-key">Save</button>
+      </div>
+      <p class="note">Get your API key from <a href="https://console.groq.com/keys" class="external-link">Groq Console</a></p>
+    </div>
+
+    <div class="section">
+      <h2>Permissions</h2>
+      <p class="note">This app requires microphone permissions. You will be prompted to allow access when you start recording.</p>
+    </div>
+
+    <div class="section">
+      <h2>Transcription</h2>
+      <div class="controls">
+        <button id="record-btn" class="primary-btn">Start Recording</button>
+        <div id="status">Not recording</div>
+      </div>
+      <div class="shortcut-info">
+        <p>Global Shortcut: <span class="shortcut">Cmd+Shift+Space</span></p>
+      </div>
+    </div>
+
+    <div class="section" id="result-section">
+      <h2>Last Transcription</h2>
+      <div id="transcription-result" class="transcription-box">No transcription yet</div>
+    </div>
+
+    <div id="notification" class="hidden"></div>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>

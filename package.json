@@ -1,0 +1,38 @@
+{
+  "name": "whisper-transcriber",
+  "version": "1.0.0",
+  "description": "Desktop app for transcribing audio using Groq API and Whisper",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "build": "electron-builder",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "electron-store": "^8.1.0",
+    "form-data": "^4.0.2",
+    "groq-sdk": "^0.3.0",
+    "node-fetch": "^2.7.0"
+  },
+  "optionalDependencies": {
+    "robotjs": "^0.6.0"
+  },
+  "devDependencies": {
+    "electron": "^28.1.0",
+    "electron-builder": "^24.6.4",
+    "electron-rebuild": "^3.2.7"
+  },
+  "build": {
+    "appId": "com.whispertranscriber.app",
+    "mac": {
+      "category": "public.app-category.utilities"
+    },
+    "extraResources": [
+      "public/icons/**"
+    ]
+  }
+}
