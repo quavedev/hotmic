@@ -49,54 +49,79 @@ function createWindow() {
 
 // Function to create floating overlay window for recording visualization
 function createOverlayWindow() {
-  // If window already exists, just show it
-  if (overlayWindow) {
-    overlayWindow.show();
-    return;
-  }
-  
-  // Get the primary display to center the window
-  const { screen } = require('electron');
-  const primaryDisplay = screen.getPrimaryDisplay();
-  const { width, height } = primaryDisplay.workAreaSize;
-  
-  // Create a transparent, frameless window
-  overlayWindow = new BrowserWindow({
-    width: 300,
-    height: 300,
-    x: Math.floor(width / 2 - 150),  // Center horizontally
-    y: Math.floor(height / 2 - 150),  // Center vertically
-    frame: false,
-    transparent: true,
-    resizable: false,
-    skipTaskbar: true,
-    alwaysOnTop: true,
-    show: false,
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
+  try {
+    // First check if the window already exists but is just hidden
+    if (overlayWindow && !overlayWindow.isDestroyed()) {
+      overlayWindow.show();
+      return;
     }
-  });
-  
-  // Load the overlay HTML
-  overlayWindow.loadFile(path.join(__dirname, '../public/overlay.html'));
-  
-  // Hide instead of close when the close button is clicked
-  overlayWindow.on('close', (event) => {
-    event.preventDefault();
-    overlayWindow.hide();
-  });
-  
-  // Show dev tools in development mode
-  if (process.argv.includes('--dev')) {
-    overlayWindow.webContents.openDevTools({ mode: 'detach' });
+    
+    // Clean up any existing window that might be in a bad state
+    if (overlayWindow) {
+      try {
+        if (!overlayWindow.isDestroyed()) {
+          overlayWindow.close();
+        }
+      } catch (e) {
+        console.log('Error cleaning up existing overlay window:', e);
+      }
+      overlayWindow = null;
+    }
+    
+    // Get the primary display to center the window
+    const { screen } = require('electron');
+    const primaryDisplay = screen.getPrimaryDisplay();
+    const { width, height } = primaryDisplay.workAreaSize;
+    
+    // Create a transparent, frameless window
+    overlayWindow = new BrowserWindow({
+      width: 300,
+      height: 300,
+      x: Math.floor(width / 2 - 150),  // Center horizontally
+      y: Math.floor(height / 2 - 150),  // Center vertically
+      frame: false,
+      transparent: true,
+      resizable: false,
+      skipTaskbar: true,
+      alwaysOnTop: true,
+      show: false,
+      webPreferences: {
+        preload: path.join(__dirname, 'preload.js'),
+        contextIsolation: true,
+        nodeIntegration: false,
+      }
+    });
+    
+    // Handle window closed event to clean up references
+    overlayWindow.on('closed', () => {
+      overlayWindow = null;
+    });
+    
+    // Load the overlay HTML
+    overlayWindow.loadFile(path.join(__dirname, '../public/overlay.html'));
+    
+    // When the user clicks close, actually hide the window
+    overlayWindow.on('close', (event) => {
+      // Only prevent close if we're not quitting the app
+      if (!app.isQuitting) {
+        event.preventDefault();
+        overlayWindow.hide();
+      }
+    });
+    
+    // Show dev tools in development mode
+    if (process.argv.includes('--dev')) {
+      overlayWindow.webContents.openDevTools({ mode: 'detach' });
+    }
+    
+    // When the window is ready, show it with a nice fade-in
+    overlayWindow.once('ready-to-show', () => {
+      overlayWindow.show();
+    });
+  } catch (error) {
+    console.error('Error creating overlay window:', error);
+    overlayWindow = null;
   }
-  
-  // When the window is ready, show it with a nice fade-in
-  overlayWindow.once('ready-to-show', () => {
-    overlayWindow.show();
-  });
 }
 
 function createTray() {
@@ -254,19 +279,32 @@ async function transcribeAudio(base64Audio) {
 
 // This function now toggles recording and manages the overlay
 function toggleRecording() {
-  // If this was triggered by the global shortcut, create/show the overlay window
-  if (!mainWindow.isFocused()) {
-    createOverlayWindow();
-  }
-  
-  // Notify the main window to toggle recording
-  if (mainWindow) {
-    mainWindow.webContents.send('toggle-recording');
-  }
-  
-  // Notify the overlay window (if it exists) about the recording toggle
-  if (overlayWindow && overlayWindow.isVisible()) {
-    overlayWindow.webContents.send('toggle-recording');
+  try {
+    // If this was triggered by the global shortcut and we're not currently recording
+    // Only create overlay window if not already recording
+    if (!mainWindow.isFocused() && !isRecording) {
+      if (!overlayWindow || overlayWindow.isDestroyed()) {
+        createOverlayWindow();
+      } else if (!overlayWindow.isVisible()) {
+        overlayWindow.show();
+      }
+    }
+    
+    // Notify the main window to toggle recording
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('toggle-recording');
+    }
+    
+    // Notify the overlay window (if it exists) about the recording toggle
+    if (overlayWindow && !overlayWindow.isDestroyed() && overlayWindow.isVisible()) {
+      overlayWindow.webContents.send('toggle-recording');
+    }
+  } catch (error) {
+    console.error('Error in toggleRecording:', error);
+    // Clean up reference to destroyed windows
+    if (overlayWindow && overlayWindow.isDestroyed()) {
+      overlayWindow = null;
+    }
   }
 }
 
@@ -322,6 +360,16 @@ ipcMain.handle('update-recording-state', (event, isCurrentlyRecording) => {
       tray.setToolTip('Whisper Transcriber (Recording...)');
     } else {
       tray.setToolTip('Whisper Transcriber');
+      
+      // If we're stopping recording and have an overlay window, hide it
+      if (!isRecording && overlayWindow && !overlayWindow.isDestroyed()) {
+        // Wait a short time to allow any final messages to be processed
+        setTimeout(() => {
+          if (overlayWindow && !overlayWindow.isDestroyed()) {
+            overlayWindow.hide();
+          }
+        }, 500);
+      }
     }
   }
   
@@ -463,7 +511,19 @@ app.on('window-all-closed', () => {
   }
 });
 
+// Add a flag to track when the app is quitting
+app.isQuitting = false;
+
 app.on('will-quit', () => {
+  // Set the flag so windows know we're quitting
+  app.isQuitting = true;
+  
   // Unregister shortcut
   globalShortcut.unregisterAll();
+  
+  // Close overlay window properly
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
+    overlayWindow.close();
+    overlayWindow = null;
+  }
 });
