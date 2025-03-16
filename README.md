@@ -1,14 +1,15 @@
 # Whisper Transcriber
 
-A macOS desktop application for transcribing audio using the Groq API and Whisper model. This app allows you to transcribe speech from your microphone and automatically paste it into any text field on your Mac.
+A macOS desktop application for transcribing audio using the Groq API and Whisper model. This app allows you to transcribe speech from your microphone and automatically copy it to your clipboard for pasting into any text field.
 
 ## Features
 
-- Record audio from your microphone with a simple click or global keyboard shortcut
-- Transcribe speech using Groq's API and Whisper model
-- Automatically paste transcribed text into any text field
+- Record audio from your microphone with a simple click or global keyboard shortcut (Cmd+Shift+Space)
+- Transcribe speech using Groq's Speech-to-Text API with the Whisper model
+- Automatically copy transcriptions to your clipboard
 - System tray integration for easy access
 - Persistent API key storage
+- No external dependencies - uses browser's built-in Web Audio API
 
 ## Requirements
 
