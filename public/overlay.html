@@ -199,8 +199,19 @@
     
     // Add event listeners
     closeBtn.addEventListener('click', () => {
+      // Notify main process to stop recording
       window.electronAPI.updateRecordingState(false);
-      window.close();
+      // Hide window with fade effect before closing
+      container.classList.remove('show');
+      setTimeout(() => {
+        window.close();
+      }, 300);
+    });
+    
+    // Also handle window being closed or unloaded
+    window.addEventListener('beforeunload', () => {
+      // This ensures the main process knows recording has stopped
+      window.electronAPI.updateRecordingState(false);
     });
     
     // Handle recording toggle from main process

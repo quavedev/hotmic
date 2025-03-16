@@ -374,8 +374,17 @@ ipcMain.handle('get-global-shortcut', () => {
 
 // Handler for receiving audio levels and forwarding to overlay window
 ipcMain.handle('audio-level', (event, level) => {
-  if (overlayWindow && overlayWindow.isVisible()) {
-    overlayWindow.webContents.send('audio-level', level);
+  try {
+    // Only send the audio level if the window exists, is visible, and not destroyed
+    if (overlayWindow && !overlayWindow.isDestroyed() && overlayWindow.isVisible()) {
+      overlayWindow.webContents.send('audio-level', level);
+    }
+  } catch (error) {
+    console.error('Error sending audio level to overlay:', error);
+    // If we get an error, the window is probably gone, so set it to null
+    if (overlayWindow && overlayWindow.isDestroyed()) {
+      overlayWindow = null;
+    }
   }
   return true;
 });

@@ -264,13 +264,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   let audioContext;
   let analyzer;
   let analyzerInterval;
+  let isSendingAudioLevels = false;
   
   function setupAudioAnalyzer(stream) {
     // Clean up any existing analyzer
-    if (analyzerInterval) {
-      clearInterval(analyzerInterval);
-      analyzerInterval = null;
-    }
+    cleanupAudioAnalyzer();
     
     try {
       // Create audio context and analyzer
@@ -284,25 +282,43 @@ document.addEventListener('DOMContentLoaded', async () => {
       const bufferLength = analyzer.frequencyBinCount;
       const dataArray = new Uint8Array(bufferLength);
       
+      // Flag to track if we should be sending audio levels
+      isSendingAudioLevels = true;
+      
       // Function to analyze volume level
       const analyzeVolume = () => {
-        if (!isRecording) return;
-        
-        // Get frequency data
-        analyzer.getByteFrequencyData(dataArray);
-        
-        // Calculate average volume (0-255)
-        let sum = 0;
-        for (let i = 0; i < bufferLength; i++) {
-          sum += dataArray[i];
+        // Stop sending if we're no longer recording or flag is turned off
+        if (!isRecording || !isSendingAudioLevels) {
+          cleanupAudioAnalyzer();
+          return;
         }
-        const average = sum / bufferLength;
         
-        // Normalize to 0-1 range
-        const normalizedVolume = Math.min(1, average / 128);
-        
-        // Send to main process for overlay window
-        window.electronAPI.sendAudioLevel?.(normalizedVolume);
+        try {
+          // Get frequency data
+          analyzer.getByteFrequencyData(dataArray);
+          
+          // Calculate average volume (0-255)
+          let sum = 0;
+          for (let i = 0; i < bufferLength; i++) {
+            sum += dataArray[i];
+          }
+          const average = sum / bufferLength;
+          
+          // Normalize to 0-1 range
+          const normalizedVolume = Math.min(1, average / 128);
+          
+          // Send to main process for overlay window
+          if (window.electronAPI.sendAudioLevel) {
+            window.electronAPI.sendAudioLevel(normalizedVolume).catch(err => {
+              // If there's an error sending levels, stop the analyzer
+              console.log('Error sending audio level, stopping analyzer:', err);
+              cleanupAudioAnalyzer();
+            });
+          }
+        } catch (error) {
+          console.error('Error analyzing audio:', error);
+          cleanupAudioAnalyzer();
+        }
       };
       
       // Start analyzing at interval
@@ -310,7 +326,31 @@ document.addEventListener('DOMContentLoaded', async () => {
       
     } catch (error) {
       console.error('Error setting up audio analyzer:', error);
+      cleanupAudioAnalyzer();
     }
+  }
+  
+  // Helper function to clean up audio analyzer resources
+  function cleanupAudioAnalyzer() {
+    isSendingAudioLevels = false;
+    
+    if (analyzerInterval) {
+      clearInterval(analyzerInterval);
+      analyzerInterval = null;
+    }
+    
+    if (audioContext && audioContext.state !== 'closed') {
+      try {
+        audioContext.close().catch(err => {
+          console.log('Error closing audio context:', err);
+        });
+      } catch (e) {
+        console.log('Error closing audio context:', e);
+      }
+    }
+    
+    audioContext = null;
+    analyzer = null;
   }
   
   function stopRecording() {
@@ -322,16 +362,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       recordingTimer = null;
     }
     
-    // Stop audio analyzer
-    if (analyzerInterval) {
-      clearInterval(analyzerInterval);
-      analyzerInterval = null;
-    }
-    
-    // Close audio context to free up resources
-    if (audioContext && audioContext.state !== 'closed') {
-      audioContext.close().catch(console.error);
-    }
+    // Clean up audio analyzer resources
+    cleanupAudioAnalyzer();
     
     // Stop recording
     mediaRecorder.stop();
@@ -422,16 +454,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       window.removeEventListener('keyup', recordKeyUp);
     }
     
-    // Stop audio analyzer
-    if (analyzerInterval) {
-      clearInterval(analyzerInterval);
-      analyzerInterval = null;
-    }
-    
-    // Close audio context to free up resources
-    if (audioContext && audioContext.state !== 'closed') {
-      audioContext.close().catch(console.error);
-    }
+    // Clean up audio analyzer resources
+    cleanupAudioAnalyzer();
     
     // Stop recording if active
     if (isRecording && mediaRecorder) {
