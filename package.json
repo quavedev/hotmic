@@ -19,7 +19,6 @@
     "node-fetch": "^2.7.0"
   },
   "optionalDependencies": {
-    "robotjs": "^0.6.0"
   },
   "devDependencies": {
     "electron": "^28.1.0",

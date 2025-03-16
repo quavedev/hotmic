@@ -178,10 +178,33 @@
     const timerElement = document.querySelector('.timer');
     
     // State
-    let isRecording = false;
+    let isRecording = true; // Start as recording since overlay is shown during recording
     let startTime = null;
     let timerInterval = null;
     let waveInterval = null;
+    console.log("Overlay window created - initial state: recording=true");
+    
+    // Handle ESC key to close window and cancel recording
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        console.log("ESC key pressed - canceling recording");
+        // Cancel recording
+        isRecording = false;
+        window.electronAPI.updateRecordingState(false);
+        
+        // Clean up UI
+        recordingCircle.classList.remove('active');
+        clearInterval(waveInterval);
+        clearInterval(timerInterval);
+        
+        // Fade out and close
+        container.classList.remove('show');
+        setTimeout(() => {
+          console.log("ESC key handler - closing window");
+          window.close();
+        }, 300);
+      }
+    });
     
     // Initialize
     document.addEventListener('DOMContentLoaded', () => {
@@ -199,11 +222,20 @@
     
     // Add event listeners
     closeBtn.addEventListener('click', () => {
-      // Notify main process to stop recording
+      console.log("Close button clicked - canceling recording");
+      // Cancel recording
+      isRecording = false;
       window.electronAPI.updateRecordingState(false);
+      
+      // Clean up UI
+      recordingCircle.classList.remove('active');
+      clearInterval(waveInterval);
+      clearInterval(timerInterval);
+      
       // Hide window with fade effect before closing
       container.classList.remove('show');
       setTimeout(() => {
+        console.log("Close button handler - closing window");
         window.close();
       }, 300);
     });
@@ -216,26 +248,44 @@
     
     // Handle recording toggle from main process
     window.electronAPI.onToggleRecording(() => {
+      console.log(`Overlay received toggle-recording. Current state: ${isRecording}`);
+      
+      // Toggle state
       isRecording = !isRecording;
+      console.log(`Overlay new recording state: ${isRecording}`);
       
       if (isRecording) {
+        console.log("Overlay starting recording visualization");
         recordingCircle.classList.add('active');
         setupWaveAnimation();
         startTimer();
       } else {
+        console.log("Overlay stopping recording visualization");
         recordingCircle.classList.remove('active');
         clearInterval(waveInterval);
         clearInterval(timerInterval);
+        
+        // Fade out and close the window
+        console.log("Overlay fading out");
+        container.classList.remove('show');
+        
+        // Close the window after animation
         setTimeout(() => {
+          console.log("Overlay closing window");
           window.close();
-        }, 500);
+        }, 300);
       }
     });
     
     // Handle audio level updates from main process
-    window.electronAPI.onAudioLevel((level) => {
+    const removeAudioLevelListener = window.electronAPI.onAudioLevel((level) => {
       // Use audio level to adjust wave animations
       triggerWaveWithLevel(level);
+    });
+    
+    // Clean up listeners when window closes
+    window.addEventListener('beforeunload', () => {
+      if (removeAudioLevelListener) removeAudioLevelListener();
     });
     
     // Functions

@@ -50,14 +50,11 @@ function createWindow() {
 // Function to create floating overlay window for recording visualization
 function createOverlayWindow() {
   try {
-    // First check if the window already exists but is just hidden
-    if (overlayWindow && !overlayWindow.isDestroyed()) {
-      overlayWindow.show();
-      return;
-    }
+    console.log("Creating overlay window");
     
-    // Clean up any existing window that might be in a bad state
+    // Always clean up any existing window
     if (overlayWindow) {
+      console.log("Cleaning up existing overlay window");
       try {
         if (!overlayWindow.isDestroyed()) {
           overlayWindow.close();
@@ -73,6 +70,7 @@ function createOverlayWindow() {
     const primaryDisplay = screen.getPrimaryDisplay();
     const { width, height } = primaryDisplay.workAreaSize;
     
+    console.log("Creating new overlay BrowserWindow");
     // Create a transparent, frameless window
     overlayWindow = new BrowserWindow({
       width: 300,
@@ -94,18 +92,21 @@ function createOverlayWindow() {
     
     // Handle window closed event to clean up references
     overlayWindow.on('closed', () => {
+      console.log("Overlay window closed event - nullifying reference");
       overlayWindow = null;
     });
     
     // Load the overlay HTML
+    console.log("Loading overlay HTML");
     overlayWindow.loadFile(path.join(__dirname, '../public/overlay.html'));
     
-    // When the user clicks close, actually hide the window
+    // Always destroy the window when close is requested - never just hide
     overlayWindow.on('close', (event) => {
-      // Only prevent close if we're not quitting the app
+      console.log("Overlay window close event");
+      // Only prevent default if we're not quitting the app
       if (!app.isQuitting) {
-        event.preventDefault();
-        overlayWindow.hide();
+        // We no longer prevent default or hide - let it close naturally
+        console.log("App is not quitting - allowing window to close");
       }
     });
     
@@ -116,6 +117,7 @@ function createOverlayWindow() {
     
     // When the window is ready, show it with a nice fade-in
     overlayWindow.once('ready-to-show', () => {
+      console.log("Overlay window ready-to-show");
       overlayWindow.show();
     });
   } catch (error) {
@@ -277,31 +279,56 @@ async function transcribeAudio(base64Audio) {
   }
 }
 
-// This function now toggles recording and manages the overlay
+// This function toggles recording state when hotkey is pressed
 function toggleRecording() {
   try {
-    // If this was triggered by the global shortcut and we're not currently recording
-    // Only create overlay window if not already recording
-    if (!mainWindow.isFocused() && !isRecording) {
-      if (!overlayWindow || overlayWindow.isDestroyed()) {
-        createOverlayWindow();
-      } else if (!overlayWindow.isVisible()) {
-        overlayWindow.show();
+    console.log(`toggleRecording called. Current state: isRecording=${isRecording}, has overlay window=${!!overlayWindow}, overlay destroyed=${overlayWindow ? overlayWindow.isDestroyed() : 'N/A'}`);
+    
+    // Toggle recording state
+    isRecording = !isRecording;
+    console.log(`New recording state: ${isRecording}`);
+    
+    // CASE 1: Starting a new recording
+    if (isRecording) {
+      console.log("Starting recording");
+      // If main window is not focused, we need to show/create an overlay
+      if (!mainWindow.isFocused()) {
+        // Ensure overlay window exists and is visible
+        if (!overlayWindow || overlayWindow.isDestroyed()) {
+          console.log("Creating new overlay window");
+          createOverlayWindow();
+        } else if (!overlayWindow.isVisible()) {
+          console.log("Showing existing overlay window");
+          overlayWindow.show();
+        }
+      }
+    } 
+    // CASE 2: Stopping an active recording
+    else {
+      console.log("Stopping recording");
+      // When stopping, we hide the overlay but don't destroy it yet
+      // (it will be destroyed once the animation completes)
+      if (overlayWindow && !overlayWindow.isDestroyed() && overlayWindow.isVisible()) {
+        console.log("Hiding overlay window");
+        // Just trigger animation, actual close happens in the renderer
+        overlayWindow.webContents.send('toggle-recording');
       }
     }
     
-    // Notify the main window to toggle recording
+    // Always notify main window
     if (mainWindow && !mainWindow.isDestroyed()) {
+      console.log("Notifying main window of toggle");
       mainWindow.webContents.send('toggle-recording');
     }
     
-    // Notify the overlay window (if it exists) about the recording toggle
-    if (overlayWindow && !overlayWindow.isDestroyed() && overlayWindow.isVisible()) {
+    // Only notify overlay if we're starting recording or if we haven't notified it yet
+    if (isRecording && overlayWindow && !overlayWindow.isDestroyed() && overlayWindow.isVisible()) {
+      console.log("Notifying overlay window of toggle");
       overlayWindow.webContents.send('toggle-recording');
     }
   } catch (error) {
     console.error('Error in toggleRecording:', error);
-    // Clean up reference to destroyed windows
+    // Clean up references to destroyed windows
     if (overlayWindow && overlayWindow.isDestroyed()) {
       overlayWindow = null;
     }
@@ -353,24 +380,25 @@ ipcMain.handle('transcribe-audio', async (event, base64Audio) => {
 
 // New handler to update recording state
 ipcMain.handle('update-recording-state', (event, isCurrentlyRecording) => {
+  console.log(`update-recording-state called with: ${isCurrentlyRecording}, previous: ${isRecording}`);
+  
+  // Update global state
   isRecording = isCurrentlyRecording;
   
+  // Update tray tooltip
   if (tray) {
     if (isRecording) {
       tray.setToolTip('Whisper Transcriber (Recording...)');
     } else {
       tray.setToolTip('Whisper Transcriber');
-      
-      // If we're stopping recording and have an overlay window, hide it
-      if (!isRecording && overlayWindow && !overlayWindow.isDestroyed()) {
-        // Wait a short time to allow any final messages to be processed
-        setTimeout(() => {
-          if (overlayWindow && !overlayWindow.isDestroyed()) {
-            overlayWindow.hide();
-          }
-        }, 500);
-      }
     }
+  }
+  
+  // When stopping recording from a renderer process
+  if (!isRecording) {
+    console.log("Recording stopped via IPC");
+    // Notification is no longer needed - toggling will be handled by
+    // the source of the update
   }
   
   return true;
@@ -520,6 +548,9 @@ app.on('will-quit', () => {
   
   // Unregister shortcut
   globalShortcut.unregisterAll();
+  
+  // Reset recording state
+  isRecording = false;
   
   // Close overlay window properly
   if (overlayWindow && !overlayWindow.isDestroyed()) {

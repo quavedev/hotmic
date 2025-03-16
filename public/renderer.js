@@ -213,6 +213,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
   
+  // Listen for Escape key to cancel recording
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && isRecording) {
+      // Just stop recording without processing
+      cleanupAudioAnalyzer();
+      if (mediaRecorder) {
+        mediaRecorder.stop();
+        if (mediaRecorder.stream) {
+          mediaRecorder.stream.getTracks().forEach(track => track.stop());
+        }
+      }
+      isRecording = false;
+      updateRecordingUI(false);
+      window.electronAPI.updateRecordingState(false);
+      audioChunks = [];
+    }
+  });
+  
   async function startRecording() {
     const apiKey = await window.electronAPI.getApiKey();
     if (!apiKey) {
