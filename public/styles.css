@@ -113,17 +113,29 @@ button:active {
   }
 }
 
-.shortcut-info {
-  text-align: center;
-  margin-top: 8px;
+.shortcut-record-group {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
 }
 
-.shortcut {
-  background-color: #f2f2f2;
-  padding: 4px 8px;
-  border-radius: 4px;
+.shortcut-record-group input {
+  flex: 1;
   font-family: monospace;
   font-weight: bold;
+}
+
+#record-shortcut-btn {
+  background-color: #34c759;
+}
+
+#record-shortcut-btn.recording {
+  background-color: #ff3b30;
+  animation: pulse 1.5s infinite;
+}
+
+#save-shortcut-btn {
+  width: 100%;
 }
 
 .transcription-box {

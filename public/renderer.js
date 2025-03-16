@@ -2,6 +2,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   // DOM elements
   const apiKeyInput = document.getElementById('api-key');
   const saveApiKeyBtn = document.getElementById('save-api-key');
+  const shortcutInput = document.getElementById('shortcut-input');
+  const recordShortcutBtn = document.getElementById('record-shortcut-btn');
+  const saveShortcutBtn = document.getElementById('save-shortcut-btn');
   const recordBtn = document.getElementById('record-btn');
   const statusElement = document.getElementById('status');
   const transcriptionResult = document.getElementById('transcription-result');
@@ -23,6 +26,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     }, 500);
   }
   
+  // Get and display the current global shortcut
+  const currentShortcut = await window.electronAPI.getGlobalShortcut();
+  shortcutInput.value = currentShortcut;
+  
   // Set up listeners for events from main process
   const removeRecordingStatusListener = window.electronAPI.onRecordingStatus((recording) => {
     updateRecordingUI(recording);
@@ -41,7 +48,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     toggleRecording();
   });
   
-  // Event listeners
+  const removeShortcutUpdatedListener = window.electronAPI.onShortcutUpdated((shortcut) => {
+    shortcutInput.value = shortcut;
+    showNotification(`Global shortcut updated to: ${shortcut}`, 'success');
+  });
+
+  // Shortcut recording variables
+  let isRecordingShortcut = false;
+  let recordedKeys = new Set();
+  let keyOrder = [];
+  
+  // Event listeners for API key
   saveApiKeyBtn.addEventListener('click', async () => {
     const apiKey = apiKeyInput.value.trim();
     if (!apiKey) {
@@ -58,6 +75,133 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
   
+  // Event listeners for shortcut recording
+  recordShortcutBtn.addEventListener('click', () => {
+    toggleShortcutRecording();
+  });
+  
+  saveShortcutBtn.addEventListener('click', async () => {
+    const shortcut = shortcutInput.value.trim();
+    if (!shortcut) {
+      showNotification('Please record a shortcut first', 'error');
+      return;
+    }
+    
+    const success = await window.electronAPI.setGlobalShortcut(shortcut);
+    
+    if (success) {
+      showNotification(`Global shortcut set to: ${shortcut}`, 'success');
+    } else {
+      showNotification('Failed to register shortcut. Try a different combination.', 'error');
+    }
+  });
+
+  function toggleShortcutRecording() {
+    isRecordingShortcut = !isRecordingShortcut;
+    
+    if (isRecordingShortcut) {
+      // Start recording
+      recordShortcutBtn.textContent = 'Stop';
+      recordShortcutBtn.classList.add('recording');
+      shortcutInput.value = 'Press keys...';
+      recordedKeys.clear();
+      keyOrder = [];
+      
+      // Add key listeners
+      window.addEventListener('keydown', recordKeyDown);
+      window.addEventListener('keyup', recordKeyUp);
+    } else {
+      // Stop recording
+      recordShortcutBtn.textContent = 'Record';
+      recordShortcutBtn.classList.remove('recording');
+      window.removeEventListener('keydown', recordKeyDown);
+      window.removeEventListener('keyup', recordKeyUp);
+      
+      // Format the shortcut
+      formatShortcut();
+    }
+  }
+  
+  function recordKeyDown(event) {
+    if (!isRecordingShortcut) return;
+    
+    event.preventDefault();
+    
+    const key = normalizeKey(event.key);
+    if (!recordedKeys.has(key)) {
+      recordedKeys.add(key);
+      keyOrder.push(key);
+      updateShortcutDisplay();
+    }
+  }
+  
+  function recordKeyUp(event) {
+    // Nothing needed here for now
+  }
+  
+  function normalizeKey(key) {
+    // Normalize key names
+    switch (key) {
+      case ' ':
+        return 'Space';
+      case 'Control':
+        return 'CommandOrControl';
+      case 'Meta':
+        return 'CommandOrControl';
+      case 'ArrowUp':
+        return 'Up';
+      case 'ArrowDown':
+        return 'Down';
+      case 'ArrowLeft':
+        return 'Left';
+      case 'ArrowRight':
+        return 'Right';
+      default:
+        // Capitalize first letter for single character keys
+        if (key.length === 1) {
+          return key.toUpperCase();
+        }
+        return key;
+    }
+  }
+  
+  function updateShortcutDisplay() {
+    if (keyOrder.length === 0) {
+      shortcutInput.value = 'Press keys...';
+    } else {
+      shortcutInput.value = keyOrder.join('+');
+    }
+  }
+  
+  function formatShortcut() {
+    if (keyOrder.length === 0) {
+      shortcutInput.value = '';
+      return;
+    }
+    
+    // Move modifier keys to the front
+    const modifiers = ['CommandOrControl', 'Alt', 'Shift', 'Option'];
+    const sortedKeys = [];
+    
+    // First add modifiers in correct order
+    modifiers.forEach(mod => {
+      if (recordedKeys.has(mod)) {
+        sortedKeys.push(mod);
+        recordedKeys.delete(mod);
+      }
+    });
+    
+    // Then add remaining keys in the order they were pressed
+    keyOrder.forEach(key => {
+      if (recordedKeys.has(key)) {
+        sortedKeys.push(key);
+      }
+    });
+    
+    shortcutInput.value = sortedKeys.join('+');
+  }
+  
+  // Audio recording
   recordBtn.addEventListener('click', toggleRecording);
   
   // Functions to handle recording
@@ -198,10 +342,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   // Clean up event listeners when window is closed
   window.addEventListener('beforeunload', () => {
+    // Remove IPC event listeners
     removeRecordingStatusListener();
     removeTranscriptionListener();
     removeErrorListener();
     removeToggleRecordingListener();
+    removeShortcutUpdatedListener();
+    
+    // Remove DOM event listeners if recording shortcut
+    if (isRecordingShortcut) {
+      window.removeEventListener('keydown', recordKeyDown);
+      window.removeEventListener('keyup', recordKeyUp);
+    }
     
     // Stop recording if active
     if (isRecording && mediaRecorder) {

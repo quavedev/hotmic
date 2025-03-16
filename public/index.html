@@ -26,13 +26,23 @@
     </div>
 
     <div class="section">
+      <h2>Shortcuts</h2>
+      <div class="input-group">
+        <label for="shortcut-input">Global Shortcut:</label>
+        <div class="shortcut-record-group">
+          <input type="text" id="shortcut-input" readonly placeholder="Click to record shortcut" />
+          <button id="record-shortcut-btn">Record</button>
+        </div>
+        <button id="save-shortcut-btn">Save Shortcut</button>
+      </div>
+      <p class="note">Click "Record" and press your desired key combination, then "Save Shortcut"</p>
+    </div>
+
+    <div class="section">
       <h2>Transcription</h2>
       <div class="controls">
         <button id="record-btn" class="primary-btn">Start Recording</button>
         <div id="status">Not recording</div>
-      </div>
-      <div class="shortcut-info">
-        <p>Global Shortcut: <span class="shortcut">Cmd+Shift+Space</span></p>
       </div>
     </div>
 

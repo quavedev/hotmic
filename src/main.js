@@ -15,6 +15,7 @@ let tray = null;
 let mainWindow = null;
 let isRecording = false;
 let apiKey = store.get('apiKey');
+let globalShortcutKey = store.get('globalShortcut') || 'CommandOrControl+Shift+Space';
 
 // Define temporary directory for audio files
 const tempDir = path.join(os.tmpdir(), 'whisper-transcriber');
@@ -77,7 +78,7 @@ function createTray() {
   
   const contextMenu = Menu.buildFromTemplate([
     { 
-      label: 'Start/Stop Transcription (Cmd+Shift+Space)', 
+      label: `Start/Stop Transcription (${globalShortcutKey})`, 
       click: toggleRecording 
     },
     { type: 'separator' },
@@ -263,6 +264,74 @@ ipcMain.handle('update-recording-state', (event, isCurrentlyRecording) => {
   return true;
 });
 
+// Handler for saving and registering a new global shortcut
+ipcMain.handle('set-global-shortcut', async (event, shortcutKey) => {
+  try {
+    globalShortcutKey = shortcutKey;
+    store.set('globalShortcut', shortcutKey);
+    
+    // Register the new shortcut
+    const success = registerGlobalShortcut();
+    
+    // Update tray menu text if needed
+    if (success && tray) {
+      const contextMenu = Menu.buildFromTemplate([
+        { 
+          label: `Start/Stop Transcription (${globalShortcutKey})`, 
+          click: toggleRecording 
+        },
+        { type: 'separator' },
+        { 
+          label: 'Show App', 
+          click: () => mainWindow.show() 
+        },
+        { type: 'separator' },
+        { 
+          label: 'Quit', 
+          click: () => {
+            app.quit();
+          } 
+        }
+      ]);
+      tray.setContextMenu(contextMenu);
+    }
+    
+    return success;
+  } catch (error) {
+    console.error('Error setting global shortcut:', error);
+    return false;
+  }
+});
+
+// Handler for getting the current global shortcut
+ipcMain.handle('get-global-shortcut', () => {
+  return globalShortcutKey;
+});
+
+// Function to register the global shortcut
+function registerGlobalShortcut() {
+  try {
+    // Unregister any existing shortcuts first
+    globalShortcut.unregisterAll();
+    
+    // Register the new shortcut
+    const registered = globalShortcut.register(globalShortcutKey, toggleRecording);
+    if (registered) {
+      console.log(`Global shortcut ${globalShortcutKey} registered successfully`);
+      if (mainWindow) {
+        mainWindow.webContents.send('shortcut-updated', globalShortcutKey);
+      }
+      return true;
+    } else {
+      console.error(`Failed to register global shortcut ${globalShortcutKey}`);
+      return false;
+    }
+  } catch (error) {
+    console.error('Error registering global shortcut:', error);
+    return false;
+  }
+}
+
 // App lifecycle
 app.whenReady().then(async () => {
   try {
@@ -281,17 +350,8 @@ app.whenReady().then(async () => {
       // Continue without tray
     }
     
-    // Register global shortcut (Cmd+Shift+Space)
-    try {
-      const registered = globalShortcut.register('CommandOrControl+Shift+Space', toggleRecording);
-      if (registered) {
-        console.log('Global shortcut Command+Shift+Space registered successfully');
-      } else {
-        console.error('Failed to register global shortcut');
-      }
-    } catch (shortcutError) {
-      console.error('Error registering global shortcut:', shortcutError);
-    }
+    // Register the saved global shortcut
+    registerGlobalShortcut();
     
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) {
