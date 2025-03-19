@@ -713,6 +713,50 @@
       initializeUI();
       registerEventListeners();
     });
+
+    // Add keyboard shortcut listener
+    document.addEventListener('keydown', (event) => {
+      // Check for Cmd+, (comma) or Escape
+      if ((event.metaKey || event.ctrlKey) && event.key === ',') {
+        // Stop recording if active
+        if (state.isRecording) {
+          stopRecording();
+          // Clean up audio context and recorder
+          if (state.audioContext) {
+            state.audioContext.close();
+            state.audioContext = null;
+            state.analyser = null;
+          }
+          if (state.mediaRecorder && state.mediaRecorder.state !== 'inactive') {
+            state.mediaRecorder.stop();
+          }
+          // Reset state
+          state.isRecording = false;
+          state.audioData = [];
+          clearInterval(state.recordingInterval);
+        }
+        // Open settings and close overlay
+        window.api.openSettings();
+      } else if (event.key === 'Escape') {
+        // Handle escape key to cancel recording
+        if (state.isRecording) {
+          stopRecording();
+          // Clean up audio context and recorder
+          if (state.audioContext) {
+            state.audioContext.close();
+            state.audioContext = null;
+            state.analyser = null;
+          }
+          if (state.mediaRecorder && state.mediaRecorder.state !== 'inactive') {
+            state.mediaRecorder.stop();
+          }
+          // Reset state
+          state.isRecording = false;
+          state.audioData = [];
+          clearInterval(state.recordingInterval);
+        }
+      }
+    });
   </script>
 </body>
 

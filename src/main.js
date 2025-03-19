@@ -364,14 +364,6 @@ function setupIPCHandlers() {
     return store.get('shortcut') || 'Command+Shift+Space';
   });
 
-  // Audio level updates from renderer
-  ipcMain.handle('audio-level', (event, level) => {
-    if (overlayWindow && !overlayWindow.isDestroyed()) {
-      overlayWindow.webContents.send('audio-level', level);
-    }
-    return true;
-  });
-
   // Prompt settings
   ipcMain.handle('get-prompt-settings', () => {
     return store.get('promptSettings', {
@@ -389,6 +381,35 @@ function setupIPCHandlers() {
   ipcMain.handle('get-history', () => {
     cleanupOldHistory();
     return store.get('history', []);
+  });
+
+  // Settings window management
+  ipcMain.handle('open-settings', () => {
+    // Close overlay window if open
+    closeOverlayWindow();
+
+    // Stop recording if active
+    if (isRecording) {
+      isRecording = false;
+      audioData = [];
+    }
+
+    // Show settings window
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.show();
+      mainWindow.focus();
+    } else {
+      createMainWindow();
+    }
+    return true;
+  });
+
+  // Audio level updates from renderer
+  ipcMain.handle('audio-level', (event, level) => {
+    if (overlayWindow && !overlayWindow.isDestroyed()) {
+      overlayWindow.webContents.send('audio-level', level);
+    }
+    return true;
   });
 }
 
