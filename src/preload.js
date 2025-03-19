@@ -17,6 +17,10 @@ contextBridge.exposeInMainWorld('api', {
   setApiKey: (key) => ipcRenderer.invoke('set-api-key', key),
   getShortcut: () => ipcRenderer.invoke('get-shortcut'),
   setShortcut: (shortcut) => ipcRenderer.invoke('set-shortcut', shortcut),
+  getPromptSettings: () => ipcRenderer.invoke('get-prompt-settings'),
+  setPromptSettings: (settings) => ipcRenderer.invoke('set-prompt-settings', settings),
+  getHistory: () => ipcRenderer.invoke('get-history'),
+  openSettings: () => ipcRenderer.invoke('open-settings'),
 
   // Recording functionality
   sendAudioData: (buffer) => ipcRenderer.invoke('audio-data', buffer),
