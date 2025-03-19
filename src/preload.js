@@ -57,6 +57,11 @@ contextBridge.exposeInMainWorld('api', {
     return () => ipcRenderer.removeListener('shortcut-error', listener);
   },
 
+  onCancelTranscription: (callback) => {
+    ipcRenderer.on('cancel-transcription', callback);
+    return () => ipcRenderer.removeListener('cancel-transcription', callback);
+  },
+
   // History methods
   onHistoryUpdate: (callback) => ipcRenderer.on('history-updated', callback)
 });

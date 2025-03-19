@@ -384,7 +384,8 @@
       mediaRecorder: null,
       audioData: [],
       audioBars: [],
-      currentAudioLevel: 0
+      currentAudioLevel: 0,
+      isCancelled: false
     };
 
     /**
@@ -567,6 +568,13 @@
       };
 
       state.mediaRecorder.onstop = async () => {
+        // If cancelled, don't process the audio
+        if (state.isCancelled) {
+          // Clean up
+          stream.getTracks().forEach(track => track.stop());
+          return;
+        }
+
         // Convert to blob then to array buffer
         const blob = new Blob(state.audioData, { type: 'audio/wav' });
         const arrayBuffer = await blob.arrayBuffer();
@@ -699,6 +707,19 @@
 
       // Listen for transcription progress
       window.api.onTranscriptionProgress(handleTranscriptionProgress);
+
+      // Listen for cancellation
+      window.api.onCancelTranscription(() => {
+        state.isCancelled = true;
+        if (state.mediaRecorder && state.mediaRecorder.state === 'recording') {
+          state.mediaRecorder.stop();
+        }
+        state.audioData = [];
+        if (state.recordingInterval) {
+          clearInterval(state.recordingInterval);
+        }
+        state.isRecording = false;
+      });
     }
 
     // Initialize the UI
@@ -719,6 +740,7 @@
       if ((event.metaKey || event.ctrlKey) && event.key === ',') {
         // Stop recording if active
         if (state.isRecording) {
+          state.isCancelled = true;  // Set cancellation flag
           stopRecording();
           // Clean up audio context and recorder
           if (state.audioContext) {
@@ -739,6 +761,7 @@
       } else if (event.key === 'Escape') {
         // Handle escape key to cancel recording
         if (state.isRecording) {
+          state.isCancelled = true;  // Set cancellation flag
           stopRecording();
           // Clean up audio context and recorder
           if (state.audioContext) {

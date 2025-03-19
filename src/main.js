@@ -385,8 +385,11 @@ function setupIPCHandlers() {
 
   // Settings window management
   ipcMain.handle('open-settings', () => {
-    // Close overlay window if open
-    closeOverlayWindow();
+    // Close overlay window if open and cancel any ongoing transcription
+    if (overlayWindow && !overlayWindow.isDestroyed()) {
+      overlayWindow.webContents.send('cancel-transcription');
+      closeOverlayWindow();
+    }
 
     // Stop recording if active
     if (isRecording) {
