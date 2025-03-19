@@ -569,7 +569,7 @@ function createOverlayWindow() {
     skipTaskbar: true,
     alwaysOnTop: true,
     show: false,
-    titleBarStyle: 'hidden',
+    frame: false,
     vibrancy: null,
     visualEffectState: 'active',
     webPreferences: {
