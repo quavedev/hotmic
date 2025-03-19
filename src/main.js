@@ -92,6 +92,8 @@ function createOverlayWindow() {
     y: Math.floor(height / 2 - 110),
     frame: false,
     transparent: true,
+    backgroundColor: '#00000000',
+    hasShadow: false,
     resizable: false,
     skipTaskbar: true,
     alwaysOnTop: true,
