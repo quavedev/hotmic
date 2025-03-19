@@ -1009,6 +1009,11 @@
       loadSettings();
       bindEventListeners();
       setupTabs();
+
+      // Listen for history updates
+      window.api.onHistoryUpdate(() => {
+        loadHistory();
+      });
     });
   </script>
 </body>
