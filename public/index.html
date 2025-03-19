@@ -353,6 +353,152 @@
     #shortcutListener {
       margin-top: var(--spacing-sm);
     }
+
+    /* History Layout */
+    .history-layout {
+      display: flex;
+      gap: var(--spacing-md);
+      height: calc(100vh - 150px);
+      margin: calc(-1 * var(--spacing-lg));
+    }
+
+    .history-sidebar {
+      width: 300px;
+      border-right: 1px solid var(--separator);
+      overflow-y: auto;
+      padding: 0;
+    }
+
+    .history-content {
+      flex: 1;
+      padding: var(--spacing-md);
+      overflow-y: auto;
+    }
+
+    .history-list {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .history-item {
+      padding: var(--spacing-md);
+      background: var(--form-group-background);
+      border: 1px solid var(--control-border);
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .history-item:hover {
+      background: color-mix(in srgb, var(--form-group-background) 80%, var(--text));
+    }
+
+    .history-item.selected {
+      background: var(--accent);
+      color: white;
+      border-color: var(--accent);
+    }
+
+    .history-item .timestamp {
+      font-size: 12px;
+      color: var(--secondary-text);
+      margin-bottom: var(--spacing-xs);
+    }
+
+    .history-item.selected .timestamp {
+      color: rgba(255, 255, 255, 0.8);
+    }
+
+    .history-item .preview {
+      font-size: 13px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+
+    .transcript-detail {
+      height: 100%;
+    }
+
+    .transcript-detail .placeholder-message {
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--secondary-text);
+      font-size: 14px;
+    }
+
+    .transcript-detail .content {
+      display: flex;
+      flex-direction: column;
+      gap: var(--spacing-md);
+    }
+
+    .transcript-section {
+      background: var(--form-group-background);
+      border: 1px solid var(--control-border);
+      border-radius: var(--radius-md);
+      padding: var(--spacing-md);
+    }
+
+    .transcript-section h3 {
+      margin-bottom: var(--spacing-sm);
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .transcript-section .text {
+      white-space: pre-wrap;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .transcript-actions {
+      display: flex;
+      gap: var(--spacing-xs);
+      margin-top: var(--spacing-sm);
+    }
+
+    .history-sidebar .history-item {
+      padding: var(--spacing-md);
+      background: transparent;
+      border: none;
+      border-bottom: 1px solid var(--separator);
+      border-radius: 0;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      margin: 0;
+    }
+
+    .history-sidebar .history-item:last-child {
+      border-bottom: none;
+    }
+
+    .history-sidebar .history-item:hover {
+      background: color-mix(in srgb, var(--background) 95%, var(--text));
+    }
+
+    .history-sidebar .history-item.selected {
+      background: color-mix(in srgb, var(--accent) 10%, transparent);
+      color: var(--text);
+      border-color: var(--separator);
+    }
+
+    .history-sidebar .history-item.selected .timestamp {
+      color: var(--secondary-text);
+    }
+
+    /* Main content transcript sections retain bubble style */
+    .transcript-section {
+      background: var(--form-group-background);
+      border: 1px solid var(--control-border);
+      border-radius: var(--radius-md);
+      padding: var(--spacing-md);
+    }
   </style>
 </head>
 
@@ -428,10 +574,16 @@
 
       <!-- History Tab -->
       <div class="tab-panel" id="history-panel">
-        <div class="form-group">
-          <h3>Recent Transcripts</h3>
-          <div id="historyList" style="max-height: 400px; overflow-y: auto;">
-            <!-- History items will be inserted here -->
+        <div class="history-layout">
+          <div class="history-sidebar">
+            <div class="history-list" id="historyList">
+              <!-- History items will be inserted here -->
+            </div>
+          </div>
+          <div class="history-content">
+            <div id="selectedTranscript" class="transcript-detail">
+              <div class="placeholder-message">Select a transcript to view details</div>
+            </div>
           </div>
         </div>
       </div>
@@ -675,18 +827,49 @@
       history.sort((a, b) => b.timestamp - a.timestamp).forEach(item => {
         const div = document.createElement('div');
         div.className = 'history-item';
+        div.onclick = () => showTranscriptDetail(item);
 
         const date = new Date(item.timestamp);
+        const preview = item.processedText || item.rawText;
+
         div.innerHTML = `
           <div class="timestamp">${date.toLocaleString()}</div>
-          <div class="transcript">${item.processedText || 'Processing failed'}</div>
-          <div class="raw-transcript">Raw transcript: ${item.rawText}</div>
-          <button onclick="copyText('${encodeURIComponent(item.processedText || item.rawText)}')">Copy Processed</button>
-          <button onclick="copyText('${encodeURIComponent(item.rawText)}')">Copy Raw</button>
+          <div class="preview">${preview.substring(0, 100)}${preview.length > 100 ? '...' : ''}</div>
         `;
 
         historyList.appendChild(div);
       });
+    }
+
+    // Show transcript detail in the main content area
+    function showTranscriptDetail(item) {
+      // Update selected state in sidebar
+      document.querySelectorAll('.history-item').forEach(el => el.classList.remove('selected'));
+      event.currentTarget.classList.add('selected');
+
+      // Update detail view
+      const detailView = document.getElementById('selectedTranscript');
+      const date = new Date(item.timestamp);
+
+      detailView.innerHTML = `
+        <div class="content">
+          <div class="transcript-section">
+            <h3>Processed Transcript</h3>
+            <div class="text">${item.processedText || 'Processing failed'}</div>
+            <div class="transcript-actions">
+              <button onclick="copyText('${encodeURIComponent(item.processedText)}')">Copy Processed</button>
+            </div>
+          </div>
+
+          <div class="transcript-section">
+            <h3>Raw Transcript</h3>
+            <div class="text">${item.rawText}</div>
+            <div class="transcript-actions">
+              <button onclick="copyText('${encodeURIComponent(item.rawText)}')">Copy Raw</button>
+            </div>
+          </div>
+        </div>
+      `;
     }
 
     // Copy text to clipboard
