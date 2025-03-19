@@ -428,8 +428,10 @@ function initialize() {
   // When app is ready
   app.whenReady().then(() => {
     try {
-      // Hide from dock by default
-      app.dock.hide();
+      // Hide dock only if not configured to show
+      if (!store.get('showInDock', false)) {
+        app.dock.hide();
+      }
 
       // Create main window first
       createMainWindow();
@@ -443,8 +445,6 @@ function initialize() {
 
       // Handle app activation
       app.on('activate', () => {
-        app.dock.hide();
-
         if (BrowserWindow.getAllWindows().length === 0) {
           createMainWindow();
         } else if (mainWindow && !mainWindow.isVisible()) {
@@ -503,13 +503,27 @@ function createMainWindow() {
       contextIsolation: true,
     },
     show: false,
-    skipTaskbar: true,
+    skipTaskbar: false,
     title: 'Whisper Transcriber',
     titleBarStyle: 'hiddenInset',
     backgroundColor: '#00000000'
   });
 
   mainWindow.loadFile(path.join(__dirname, '../public/index.html'));
+
+  // Show in App Switcher when window is shown
+  mainWindow.on('show', () => {
+    // Show in dock temporarily while window is open
+    app.dock.show();
+  });
+
+  // Remove from App Switcher when window is hidden
+  mainWindow.on('hide', () => {
+    // Hide dock if it's not meant to be visible
+    if (!store.get('showInDock', false)) {
+      app.dock.hide();
+    }
+  });
 
   // Hide instead of close
   mainWindow.on('close', (event) => {
