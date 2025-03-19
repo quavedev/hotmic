@@ -53,12 +53,18 @@ function cleanupOldHistory() {
 
 function addToHistory(rawText, processedText) {
   const history = store.get('history', []);
-  history.push({
+  history.unshift({
     timestamp: Date.now(),
     rawText,
     processedText
   });
   store.set('history', history);
+
+  // Notify renderer of history update
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('history-updated');
+  }
+
   cleanupOldHistory();
 }
 
@@ -490,15 +496,17 @@ function createMainWindow() {
   }
 
   mainWindow = new BrowserWindow({
-    width: 600,
-    height: 400,
+    width: 800,
+    height: 600,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
     },
     show: false,
     skipTaskbar: true,
-    title: 'Whisper Transcriber'
+    title: 'Whisper Transcriber',
+    titleBarStyle: 'hiddenInset',
+    backgroundColor: '#00000000'
   });
 
   mainWindow.loadFile(path.join(__dirname, '../public/index.html'));
@@ -517,6 +525,10 @@ function createMainWindow() {
     if (!store.get('apiKey')) {
       mainWindow.show();
     }
+  });
+
+  mainWindow.on('closed', () => {
+    mainWindow = null;
   });
 }
 

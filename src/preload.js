@@ -55,5 +55,8 @@ contextBridge.exposeInMainWorld('api', {
     const listener = (_, message) => callback(message);
     ipcRenderer.on('shortcut-error', listener);
     return () => ipcRenderer.removeListener('shortcut-error', listener);
-  }
+  },
+
+  // History methods
+  onHistoryUpdate: (callback) => ipcRenderer.on('history-updated', callback)
 });

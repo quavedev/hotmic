@@ -499,6 +499,41 @@
       border-radius: var(--radius-md);
       padding: var(--spacing-md);
     }
+
+    /* Button interaction styles */
+    button:active {
+      transform: scale(0.96);
+    }
+
+    .button-success {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .button-success::after {
+      content: '✓';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+
+    .button-success.copied::after {
+      opacity: 1;
+    }
+
+    .button-success.copied {
+      background: color-mix(in srgb, var(--accent) 20%, var(--button-background));
+      transition: background 0.2s ease;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
   </style>
 </head>
 
@@ -855,9 +890,9 @@
         <div class="content">
           <div class="transcript-section">
             <h3>Processed Transcript</h3>
-            <div class="text">${item.processedText || 'Processing failed'}</div>
+            <div class="text">${processedText}</div>
             <div class="transcript-actions">
-              <button onclick="copyText('${encodeURIComponent(item.processedText)}')">Copy Processed</button>
+              <button onclick="copyToClipboard(this, '${encodeURIComponent(item.processedText)}')" class="button-success">Copy Processed</button>
             </div>
           </div>
 
@@ -865,19 +900,28 @@
             <h3>Raw Transcript</h3>
             <div class="text">${item.rawText}</div>
             <div class="transcript-actions">
-              <button onclick="copyText('${encodeURIComponent(item.rawText)}')">Copy Raw</button>
+              <button onclick="copyToClipboard(this, '${encodeURIComponent(item.rawText)}')" class="button-success">Copy Raw</button>
             </div>
           </div>
         </div>
       `;
     }
 
-    // Copy text to clipboard
-    function copyText(encodedText) {
+    // Copy text to clipboard with visual feedback
+    async function copyToClipboard(button, encodedText) {
       const text = decodeURIComponent(encodedText);
-      navigator.clipboard.writeText(text).then(() => {
-        showStatus(document.getElementById('historyStatus'), 'Copied to clipboard', 'success');
-      });
+      console.log('Copying text:', text);  // Debug log
+      try {
+        await navigator.clipboard.writeText(text);
+        button.classList.add('copied');
+
+        // Remove the copied state after animation
+        setTimeout(() => {
+          button.classList.remove('copied');
+        }, 1000);
+      } catch (err) {
+        console.error('Failed to copy text:', err);
+      }
     }
 
     // Save prompt settings
