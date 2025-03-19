@@ -91,16 +91,25 @@
       border: 1px solid var(--control-border);
       border-bottom: none;
       border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-      color: var(--text);
+      color: var(--secondary-text);
       font-size: 13px;
       cursor: pointer;
       position: relative;
       bottom: -1px;
+      transition: all 0.2s ease;
+    }
+
+    .tab-button:hover {
+      color: var(--text);
+      background: color-mix(in srgb, var(--background) 98%, var(--text));
     }
 
     .tab-button.active {
-      background: var(--tab-active-background);
-      border-bottom: 1px solid var(--tab-active-background);
+      background: var(--background);
+      border-bottom: 1px solid var(--background);
+      color: var(--text);
+      font-weight: 500;
+      box-shadow: 0 -2px 0 var(--accent);
     }
 
     /* Tab Content */
