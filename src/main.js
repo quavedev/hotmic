@@ -29,6 +29,11 @@ if (!fs.existsSync(tempDir)) {
   fs.mkdirSync(tempDir, { recursive: true });
 }
 
+// Hide from dock on macOS
+if (process.platform === 'darwin') {
+  app.dock.hide();
+}
+
 /**
  * Application State
  */
@@ -54,7 +59,9 @@ function createMainWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
     },
-    show: false
+    show: false,
+    skipTaskbar: true,
+    title: 'Whisper Transcriber'
   });
 
   mainWindow.loadFile(path.join(__dirname, '../public/index.html'));
@@ -67,6 +74,11 @@ function createMainWindow() {
       return false;
     }
   });
+
+  // Handle window creation on Windows to stay hidden from taskbar
+  if (process.platform === 'win32') {
+    mainWindow.setSkipTaskbar(true);
+  }
 
   mainWindow.once('ready-to-show', () => {
     // Only show on first launch or if API key isn't set
@@ -93,14 +105,19 @@ function createOverlayWindow() {
     frame: false,
     transparent: true,
     backgroundColor: '#00000000',
+    opacity: 1.0,
     hasShadow: false,
     resizable: false,
     skipTaskbar: true,
     alwaysOnTop: true,
     show: false,
+    titleBarStyle: 'hidden',
+    vibrancy: null,
+    visualEffectState: 'active',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
+      backgroundThrottling: false
     }
   });
 
@@ -270,6 +287,9 @@ function createTray() {
     // Create tray
     tray = new Tray(trayIcon);
 
+    // Check if we're showing in the dock
+    const showingInDock = process.platform === 'darwin' ? !app.dock.isVisible() : false;
+
     // Create context menu
     const contextMenu = Menu.buildFromTemplate([
       {
@@ -289,6 +309,14 @@ function createTray() {
       },
       { type: 'separator' },
       {
+        label: process.platform === 'darwin' ? 'Show in Dock' : 'Show in Taskbar',
+        type: 'checkbox',
+        checked: showingInDock,
+        click: () => toggleDockVisibility(),
+        enabled: process.platform === 'darwin'
+      },
+      { type: 'separator' },
+      {
         label: 'Quit',
         click: () => {
           app.isQuitting = true;
@@ -304,6 +332,24 @@ function createTray() {
   } catch (error) {
     console.error('Error creating tray:', error);
     // Continue without tray if it fails
+  }
+}
+
+/**
+ * Toggle dock/taskbar visibility
+ */
+function toggleDockVisibility() {
+  if (process.platform === 'darwin') {
+    if (app.dock.isVisible()) {
+      app.dock.hide();
+    } else {
+      app.dock.show();
+    }
+
+    // Update the tray menu after toggling
+    if (tray) {
+      createTray();
+    }
   }
 }
 
@@ -388,6 +434,11 @@ function initialize() {
   // When app is ready
   app.whenReady().then(() => {
     try {
+      // On macOS, hide from dock by default
+      if (process.platform === 'darwin') {
+        app.dock.hide();
+      }
+
       // Create main window first
       createMainWindow();
 
@@ -400,6 +451,11 @@ function initialize() {
 
       // Handle app activation
       app.on('activate', () => {
+        // On macOS hide from dock again (just in case)
+        if (process.platform === 'darwin') {
+          app.dock.hide();
+        }
+
         if (BrowserWindow.getAllWindows().length === 0) {
           createMainWindow();
         } else if (mainWindow && !mainWindow.isVisible()) {
@@ -411,11 +467,19 @@ function initialize() {
     }
   });
 
+  // Handle dock show/hide events (macOS)
+  if (process.platform === 'darwin') {
+    app.on('browser-window-focus', () => {
+      // Update the tray menu when focus changes
+      if (tray) {
+        createTray();
+      }
+    });
+  }
+
   // Prevent default behavior of closing app when all windows are closed
   app.on('window-all-closed', (e) => {
-    if (process.platform !== 'darwin') {
-      app.quit();
-    }
+    e.preventDefault(); // Prevent app from quitting when all windows are closed
   });
 
   // Clean up when app is about to quit
