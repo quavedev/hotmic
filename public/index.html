@@ -5,14 +5,16 @@
   <meta charset="UTF-8">
   <title>Whisper Transcriber Settings</title>
   <style>
+    /* Base styles */
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, sans-serif;
       margin: 0;
       padding: 20px;
       background-color: #f5f5f5;
       color: #333;
     }
 
+    /* Container */
     .container {
       max-width: 500px;
       margin: 0 auto;
@@ -22,6 +24,7 @@
       box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
     }
 
+    /* Headers */
     h1 {
       text-align: center;
       color: #333;
@@ -30,6 +33,7 @@
       border-bottom: 1px solid #eee;
     }
 
+    /* Form elements */
     .form-group {
       margin-bottom: 20px;
     }
@@ -65,6 +69,12 @@
       background-color: #0055cc;
     }
 
+    button:disabled {
+      background-color: #cccccc;
+      cursor: not-allowed;
+    }
+
+    /* Status messages */
     .status {
       margin-top: 10px;
       padding: 10px;
@@ -90,6 +100,7 @@
       border: 1px solid #bee5eb;
     }
 
+    /* Shortcut display */
     .current-shortcut {
       display: inline-block;
       padding: 3px 8px;
@@ -100,6 +111,7 @@
       margin-left: 5px;
     }
 
+    /* Footer */
     footer {
       margin-top: 20px;
       text-align: center;
@@ -113,6 +125,7 @@
   <div class="container">
     <h1>Whisper Transcriber Settings</h1>
 
+    <!-- API Key Section -->
     <div class="form-group">
       <label for="apiKey">Groq API Key:</label>
       <input type="password" id="apiKey" placeholder="Enter your Groq API key">
@@ -120,6 +133,7 @@
       <div id="apiKeyStatus" class="status"></div>
     </div>
 
+    <!-- Global Shortcut Section -->
     <div class="form-group">
       <label for="shortcut">Global Shortcut:</label>
       <div>
@@ -135,6 +149,7 @@
       <div id="shortcutStatus" class="status"></div>
     </div>
 
+    <!-- Instructions Section -->
     <div class="form-group">
       <h3>How to Use</h3>
       <ol>
@@ -147,166 +162,190 @@
   </div>
 
   <footer>
-    Whisper Transcriber uses Groq API and the Whisper model
+    Whisper Transcriber uses Groq API and Whisper-large-v3 model
   </footer>
 
   <script>
-    // DOM elements
-    const apiKeyInput = document.getElementById('apiKey');
-    const saveApiKeyBtn = document.getElementById('saveApiKey');
-    const apiKeyStatus = document.getElementById('apiKeyStatus');
-    const currentShortcut = document.getElementById('currentShortcut');
-    const changeShortcutBtn = document.getElementById('changeShortcut');
-    const shortcutListener = document.getElementById('shortcutListener');
-    const newShortcut = document.getElementById('newShortcut');
-    const saveShortcutBtn = document.getElementById('saveShortcut');
-    const cancelShortcutBtn = document.getElementById('cancelShortcut');
-    const shortcutStatus = document.getElementById('shortcutStatus');
+    /**
+     * Whisper Transcriber Settings
+     *
+     * Manages application settings like API key and global shortcut
+     */
 
-    // Key tracking for shortcut
-    let keys = new Set();
-    let listeningForShortcut = false;
+    // Application references
+    const elements = {
+      // API Key elements
+      apiKeyInput: document.getElementById('apiKey'),
+      saveApiKeyBtn: document.getElementById('saveApiKey'),
+      apiKeyStatus: document.getElementById('apiKeyStatus'),
 
-    // Load saved settings
+      // Shortcut elements
+      currentShortcut: document.getElementById('currentShortcut'),
+      changeShortcutBtn: document.getElementById('changeShortcut'),
+      shortcutListener: document.getElementById('shortcutListener'),
+      newShortcut: document.getElementById('newShortcut'),
+      saveShortcutBtn: document.getElementById('saveShortcut'),
+      cancelShortcutBtn: document.getElementById('cancelShortcut'),
+      shortcutStatus: document.getElementById('shortcutStatus')
+    };
+
+    // Application state
+    const state = {
+      keys: new Set(),
+      listeningForShortcut: false
+    };
+
+    /**
+     * Settings Management
+     */
+
+    // Load settings from store
     async function loadSettings() {
       try {
-        // Load API key
-        const apiKey = await window.api.getApiKey();
-        if (apiKey) {
-          apiKeyInput.value = apiKey;
-          apiKeyStatus.textContent = 'API key is set';
-          apiKeyStatus.className = 'status success';
-        }
-
-        // Load shortcut
-        const shortcut = await window.api.getShortcut();
-        currentShortcut.textContent = shortcut;
+        await loadApiKey();
+        await loadShortcut();
       } catch (error) {
         console.error('Error loading settings:', error);
       }
     }
 
-    // Save API key
-    saveApiKeyBtn.addEventListener('click', async () => {
-      const apiKey = apiKeyInput.value.trim();
+    // Load API key from store
+    async function loadApiKey() {
+      const apiKey = await window.api.getApiKey();
+      if (apiKey) {
+        elements.apiKeyInput.value = apiKey;
+        showStatus(elements.apiKeyStatus, 'API key is set', 'success');
+      }
+    }
+
+    // Load shortcut from store
+    async function loadShortcut() {
+      const shortcut = await window.api.getShortcut();
+      elements.currentShortcut.textContent = shortcut;
+    }
+
+    // Save API key to store
+    async function saveApiKey() {
+      const apiKey = elements.apiKeyInput.value.trim();
 
       if (!apiKey) {
-        apiKeyStatus.textContent = 'Please enter an API key';
-        apiKeyStatus.className = 'status error';
+        showStatus(elements.apiKeyStatus, 'Please enter an API key', 'error');
         return;
       }
 
       try {
         await window.api.setApiKey(apiKey);
-        apiKeyStatus.textContent = 'API key saved successfully';
-        apiKeyStatus.className = 'status success';
+        showStatus(elements.apiKeyStatus, 'API key saved successfully', 'success');
       } catch (error) {
-        apiKeyStatus.textContent = 'Error saving API key: ' + error.message;
-        apiKeyStatus.className = 'status error';
+        showStatus(elements.apiKeyStatus, `Error saving API key: ${error.message}`, 'error');
       }
-    });
+    }
 
-    // Start listening for shortcut
-    changeShortcutBtn.addEventListener('click', () => {
-      shortcutListener.style.display = 'block';
-      changeShortcutBtn.disabled = true;
-      listeningForShortcut = true;
-      keys.clear();
-      newShortcut.textContent = 'Listening...';
-      saveShortcutBtn.disabled = true;
-    });
+    /**
+     * Shortcut Management
+     */
+
+    // Start listening for shortcut keys
+    function startShortcutListener() {
+      elements.shortcutListener.style.display = 'block';
+      elements.changeShortcutBtn.disabled = true;
+      state.listeningForShortcut = true;
+      state.keys.clear();
+      elements.newShortcut.textContent = 'Listening...';
+      elements.saveShortcutBtn.disabled = true;
+    }
 
     // Cancel shortcut change
-    cancelShortcutBtn.addEventListener('click', () => {
-      shortcutListener.style.display = 'none';
-      changeShortcutBtn.disabled = false;
-      listeningForShortcut = false;
-    });
+    function cancelShortcutChange() {
+      elements.shortcutListener.style.display = 'none';
+      elements.changeShortcutBtn.disabled = false;
+      state.listeningForShortcut = false;
+    }
 
     // Save new shortcut
-    saveShortcutBtn.addEventListener('click', async () => {
-      const shortcutString = newShortcut.textContent;
+    async function saveShortcut() {
+      const shortcutString = elements.newShortcut.textContent;
 
       try {
         const success = await window.api.setShortcut(shortcutString);
 
         if (success) {
-          currentShortcut.textContent = shortcutString;
-          shortcutStatus.textContent = 'Shortcut saved successfully';
-          shortcutStatus.className = 'status success';
+          elements.currentShortcut.textContent = shortcutString;
+          showStatus(elements.shortcutStatus, 'Shortcut saved successfully', 'success');
         } else {
-          shortcutStatus.textContent = 'Failed to register shortcut';
-          shortcutStatus.className = 'status error';
+          showStatus(elements.shortcutStatus, 'Failed to register shortcut', 'error');
         }
       } catch (error) {
-        shortcutStatus.textContent = 'Error saving shortcut: ' + error.message;
-        shortcutStatus.className = 'status error';
+        showStatus(elements.shortcutStatus, `Error saving shortcut: ${error.message}`, 'error');
       }
 
-      shortcutListener.style.display = 'none';
-      changeShortcutBtn.disabled = false;
-      listeningForShortcut = false;
-    });
+      // Reset UI
+      cancelShortcutChange();
+    }
 
-    // Key event listeners for shortcut recording
-    document.addEventListener('keydown', (event) => {
-      if (!listeningForShortcut) return;
+    // Handle keydown events for shortcut recording
+    function handleKeyDown(event) {
+      if (!state.listeningForShortcut) return;
 
       event.preventDefault();
 
       // Get the key
       let key = event.key;
 
-      // Convert special keys to electron format
-      if (key === ' ') key = 'Space';
-      if (key === 'Control') key = 'Ctrl';
+      // Handle escape key to cancel
       if (key === 'Escape') {
-        cancelShortcutBtn.click();
+        cancelShortcutChange();
         return;
       }
+
+      // Convert special keys to Electron format
+      if (key === ' ') key = 'Space';
+      if (key === 'Control') key = 'Ctrl';
 
       // Capitalize first letter
       key = key.charAt(0).toUpperCase() + key.slice(1);
 
-      // Add to set
-      keys.add(key);
+      // Add to key set
+      state.keys.add(key);
 
       // Update display
       updateShortcutDisplay();
-    });
+    }
 
-    document.addEventListener('keyup', (event) => {
-      if (!listeningForShortcut) return;
+    // Handle keyup events for shortcut recording
+    function handleKeyUp(event) {
+      if (!state.listeningForShortcut) return;
 
-      // Enable save button if we have a valid shortcut
-      if (keys.size > 0) {
-        saveShortcutBtn.disabled = false;
+      // Enable save button if we have valid keys
+      if (state.keys.size > 0) {
+        elements.saveShortcutBtn.disabled = false;
       }
-    });
+    }
 
     // Update shortcut display
     function updateShortcutDisplay() {
-      if (keys.size === 0) {
-        newShortcut.textContent = 'Listening...';
+      if (state.keys.size === 0) {
+        elements.newShortcut.textContent = 'Listening...';
         return;
       }
 
       // Check for modifiers
-      const hasCtrl = keys.has('Ctrl');
-      const hasAlt = keys.has('Alt');
-      const hasShift = keys.has('Shift');
-      const hasMeta = keys.has('Meta') || keys.has('Command');
+      const hasCtrl = state.keys.has('Ctrl');
+      const hasAlt = state.keys.has('Alt');
+      const hasShift = state.keys.has('Shift');
+      const hasMeta = state.keys.has('Meta') || state.keys.has('Command');
 
       // Build shortcut string
       let shortcutParts = [];
 
+      // Add modifiers first
       if (hasMeta) shortcutParts.push('Command');
       if (hasCtrl) shortcutParts.push('Ctrl');
       if (hasAlt) shortcutParts.push('Alt');
       if (hasShift) shortcutParts.push('Shift');
 
-      // Add non-modifier keys
-      keys.forEach(key => {
+      // Add other keys
+      state.keys.forEach(key => {
         if (!['Ctrl', 'Alt', 'Shift', 'Meta', 'Command'].includes(key)) {
           shortcutParts.push(key);
         }
@@ -314,11 +353,48 @@
 
       // Format for Electron
       const shortcutString = shortcutParts.join('+');
-      newShortcut.textContent = shortcutString;
+      elements.newShortcut.textContent = shortcutString;
     }
 
-    // Load settings on page load
-    document.addEventListener('DOMContentLoaded', loadSettings);
+    /**
+     * UI Helpers
+     */
+
+    // Show status message
+    function showStatus(element, message, type) {
+      element.textContent = message;
+      element.className = `status ${type}`;
+    }
+
+    /**
+     * Event Binding
+     */
+
+    // Bind all event listeners
+    function bindEventListeners() {
+      // API Key events
+      elements.saveApiKeyBtn.addEventListener('click', saveApiKey);
+
+      // Shortcut events
+      elements.changeShortcutBtn.addEventListener('click', startShortcutListener);
+      elements.cancelShortcutBtn.addEventListener('click', cancelShortcutChange);
+      elements.saveShortcutBtn.addEventListener('click', saveShortcut);
+
+      // Key events for shortcut recording
+      document.addEventListener('keydown', handleKeyDown);
+      document.addEventListener('keyup', handleKeyUp);
+
+      // Error handling
+      window.api.onShortcutError && window.api.onShortcutError((message) => {
+        showStatus(elements.shortcutStatus, `Error: ${message}`, 'error');
+      });
+    }
+
+    // Initialize when DOM is loaded
+    document.addEventListener('DOMContentLoaded', () => {
+      loadSettings();
+      bindEventListeners();
+    });
   </script>
 </body>
 

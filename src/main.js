@@ -1,3 +1,14 @@
+/**
+ * Whisper Transcriber Main Process
+ *
+ * This file handles the main Electron process:
+ * - Window management
+ * - Recording and transcription
+ * - Communication with renderer processes
+ * - Global shortcuts
+ * - Tray icon
+ */
+
 const { app, BrowserWindow, ipcMain, globalShortcut, Menu, Tray, clipboard } = require('electron');
 const path = require('path');
 const https = require('https');
@@ -6,28 +17,36 @@ const fs = require('fs');
 const os = require('os');
 const Store = require('electron-store').default;
 
-// Initialize store for app settings
+/**
+ * Application Configuration
+ */
+// Initialize persistent store for app settings
 const store = new Store();
 
-// Define temporary directory for audio files
+// Define temp directory for audio files
 const tempDir = path.join(os.tmpdir(), 'whisper-transcriber');
 if (!fs.existsSync(tempDir)) {
   fs.mkdirSync(tempDir, { recursive: true });
 }
 
-// App state
+/**
+ * Application State
+ */
 let mainWindow = null;
 let overlayWindow = null;
 let tray = null;
 let isRecording = false;
-let recorder = null;
 let audioData = [];
 
-// =====================
-// Window Management
-// =====================
-
+/**
+ * Window Management
+ */
 function createMainWindow() {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.show();
+    return;
+  }
+
   mainWindow = new BrowserWindow({
     width: 600,
     height: 400,
@@ -59,10 +78,7 @@ function createMainWindow() {
 
 function createOverlayWindow() {
   // Close existing overlay if any
-  if (overlayWindow && !overlayWindow.isDestroyed()) {
-    overlayWindow.close();
-    overlayWindow = null;
-  }
+  closeOverlayWindow();
 
   // Get screen dimensions to center the overlay
   const { screen } = require('electron');
@@ -93,10 +109,16 @@ function createOverlayWindow() {
   });
 }
 
-// =====================
-// Recording Management
-// =====================
+function closeOverlayWindow() {
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
+    overlayWindow.close();
+    overlayWindow = null;
+  }
+}
 
+/**
+ * Recording Management
+ */
 function startRecording() {
   console.log('Starting recording...');
 
@@ -108,7 +130,7 @@ function startRecording() {
   // Show overlay window
   createOverlayWindow();
 
-  // Setup recording session in main window or overlay
+  // Start recording in overlay
   if (overlayWindow && !overlayWindow.isDestroyed()) {
     overlayWindow.webContents.send('start-recording');
   }
@@ -121,221 +143,117 @@ function stopRecording() {
 
   isRecording = false;
 
-  // Tell window to stop recording and get audio data
+  // Tell overlay to stop recording
   if (overlayWindow && !overlayWindow.isDestroyed()) {
     overlayWindow.webContents.send('stop-recording');
   }
 }
 
-// =====================
-// API and Transcription
-// =====================
-
+/**
+ * API and Transcription
+ */
 async function transcribeAudio(audioBuffer) {
+  const apiKey = store.get('apiKey');
+  if (!apiKey) {
+    throw new Error('API key not set. Please configure in settings.');
+  }
+
+  let tempFile = null;
   try {
     console.log('Transcribing audio...');
-
-    // Update overlay with status
-    if (overlayWindow && !overlayWindow.isDestroyed()) {
-      overlayWindow.webContents.send('transcription-progress', {
-        step: 'start',
-        message: 'Starting transcription...'
-      });
-    }
-
-    // Get API key
-    const apiKey = store.get('apiKey');
-    if (!apiKey) {
-      throw new Error('API key not set. Please configure in settings.');
-    }
+    updateTranscriptionProgress('start', 'Starting transcription...');
 
     // Save audio to temp file
-    const tempFile = path.join(tempDir, `recording-${Date.now()}.wav`);
+    tempFile = path.join(tempDir, `recording-${Date.now()}.wav`);
     fs.writeFileSync(tempFile, Buffer.from(audioBuffer));
 
-    // Update progress
-    if (overlayWindow && !overlayWindow.isDestroyed()) {
-      overlayWindow.webContents.send('transcription-progress', {
-        step: 'api',
-        message: 'Sending to Groq API...'
-      });
-    }
+    updateTranscriptionProgress('api', 'Sending to Groq API...');
 
-    // Create form data for API request
-    const formData = new FormData();
-    formData.append('file', fs.createReadStream(tempFile));
-    formData.append('model', 'whisper-large-v3');
+    // Send to Groq API
+    const result = await sendToGroqAPI(apiKey, tempFile);
 
-    // Send request to Groq API
-    const response = await new Promise((resolve, reject) => {
-      const formHeaders = formData.getHeaders();
-
-      const options = {
-        hostname: 'api.groq.com',
-        path: '/openai/v1/audio/transcriptions',
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          ...formHeaders
-        }
-      };
-
-      const req = https.request(options, (res) => {
-        let data = '';
-
-        res.on('data', (chunk) => {
-          data += chunk;
-
-          // Update progress
-          if (overlayWindow && !overlayWindow.isDestroyed()) {
-            overlayWindow.webContents.send('transcription-progress', {
-              step: 'receiving',
-              message: 'Receiving transcription...'
-            });
-          }
-        });
-
-        res.on('end', () => {
-          if (res.statusCode >= 200 && res.statusCode < 300) {
-            resolve({ ok: true, data });
-          } else {
-            resolve({ ok: false, statusCode: res.statusCode, data });
-          }
-        });
-      });
-
-      req.on('error', reject);
-      formData.pipe(req);
-    });
-
-    // Clean up temp file
-    if (fs.existsSync(tempFile)) {
-      fs.unlinkSync(tempFile);
-    }
-
-    if (!response.ok) {
-      throw new Error(`API error: ${response.data}`);
-    }
-
-    // Parse response
-    const result = JSON.parse(response.data);
-    const transcription = result.text;
-
-    // Update progress
-    if (overlayWindow && !overlayWindow.isDestroyed()) {
-      overlayWindow.webContents.send('transcription-progress', {
-        step: 'complete',
-        message: 'Transcription complete'
-      });
-    }
-
-    // Copy to clipboard
-    clipboard.writeText(transcription);
-
+    // Copy to clipboard and notify
+    updateTranscriptionProgress('complete', 'Transcription complete');
+    clipboard.writeText(result);
     console.log('Transcription copied to clipboard');
 
     // Close overlay after a delay
-    setTimeout(() => {
-      if (overlayWindow && !overlayWindow.isDestroyed()) {
-        overlayWindow.close();
-        overlayWindow = null;
-      }
-    }, 1500);
+    setTimeout(() => closeOverlayWindow(), 1500);
 
-    return transcription;
-
+    return result;
   } catch (error) {
     console.error('Transcription error:', error);
+    updateTranscriptionProgress('error', `Error: ${error.message}`);
 
-    // Show error in overlay
-    if (overlayWindow && !overlayWindow.isDestroyed()) {
-      overlayWindow.webContents.send('transcription-progress', {
-        step: 'error',
-        message: `Error: ${error.message}`
+    // Close overlay after a delay
+    setTimeout(() => closeOverlayWindow(), 2000);
+    throw error;
+  } finally {
+    // Clean up temp file
+    if (tempFile && fs.existsSync(tempFile)) {
+      fs.unlinkSync(tempFile);
+    }
+  }
+}
+
+function updateTranscriptionProgress(step, message) {
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
+    overlayWindow.webContents.send('transcription-progress', { step, message });
+  }
+}
+
+async function sendToGroqAPI(apiKey, audioFilePath) {
+  // Create form data for API request
+  const formData = new FormData();
+  formData.append('file', fs.createReadStream(audioFilePath));
+  formData.append('model', 'whisper-large-v3');
+
+  // Send request to Groq API
+  const response = await new Promise((resolve, reject) => {
+    const formHeaders = formData.getHeaders();
+
+    const options = {
+      hostname: 'api.groq.com',
+      path: '/openai/v1/audio/transcriptions',
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        ...formHeaders
+      }
+    };
+
+    const req = https.request(options, (res) => {
+      let data = '';
+
+      res.on('data', (chunk) => {
+        data += chunk;
+        updateTranscriptionProgress('receiving', 'Receiving transcription...');
       });
 
-      // Close overlay after a delay
-      setTimeout(() => {
-        if (overlayWindow && !overlayWindow.isDestroyed()) {
-          overlayWindow.close();
-          overlayWindow = null;
+      res.on('end', () => {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          resolve({ ok: true, data });
+        } else {
+          resolve({ ok: false, statusCode: res.statusCode, data });
         }
-      }, 2000);
-    }
+      });
+    });
 
-    throw error;
+    req.on('error', reject);
+    formData.pipe(req);
+  });
+
+  if (!response.ok) {
+    throw new Error(`API error: ${response.data}`);
   }
+
+  const result = JSON.parse(response.data);
+  return result.text;
 }
 
-// =====================
-// IPC Handlers
-// =====================
-
-// Handle recording start/stop from global shortcut
-function toggleRecording() {
-  if (isRecording) {
-    stopRecording();
-  } else {
-    startRecording();
-  }
-}
-
-// Receive audio data from renderer
-ipcMain.handle('audio-data', async (event, audioBuffer) => {
-  try {
-    const transcription = await transcribeAudio(audioBuffer);
-    return { success: true, transcription };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-});
-
-// Handle API key setting
-ipcMain.handle('set-api-key', (event, key) => {
-  store.set('apiKey', key);
-  return true;
-});
-
-// Get API key
-ipcMain.handle('get-api-key', () => {
-  return store.get('apiKey') || '';
-});
-
-// Set global shortcut
-ipcMain.handle('set-shortcut', (event, shortcut) => {
-  try {
-    // Unregister existing shortcut
-    globalShortcut.unregisterAll();
-
-    // Register new shortcut
-    globalShortcut.register(shortcut, toggleRecording);
-
-    // Save to store
-    store.set('shortcut', shortcut);
-    return true;
-  } catch (error) {
-    console.error('Error setting shortcut:', error);
-    return false;
-  }
-});
-
-// Get global shortcut
-ipcMain.handle('get-shortcut', () => {
-  return store.get('shortcut') || 'CommandOrControl+Shift+Space';
-});
-
-// Audio level updates from renderer
-ipcMain.handle('audio-level', (event, level) => {
-  if (overlayWindow && !overlayWindow.isDestroyed()) {
-    overlayWindow.webContents.send('audio-level', level);
-  }
-  return true;
-});
-
-// =====================
-// App Lifecycle
-// =====================
-
+/**
+ * Tray Management
+ */
 function createTray() {
   try {
     // Create a simple tray icon using a base64 encoded image
@@ -362,6 +280,8 @@ function createTray() {
         click: () => {
           if (mainWindow) {
             mainWindow.show();
+          } else {
+            createMainWindow();
           }
         }
       },
@@ -385,62 +305,133 @@ function createTray() {
   }
 }
 
-app.whenReady().then(() => {
-  // Create main window first
-  createMainWindow();
-
-  try {
-    // Attempt to create tray
-    createTray();
-  } catch (error) {
-    console.error('Failed to create tray:', error);
-    // App will continue without tray
-  }
-
-  try {
-    // Register global shortcut
-    const shortcut = store.get('shortcut') || 'CommandOrControl+Shift+Space';
-    globalShortcut.register(shortcut, toggleRecording);
-  } catch (error) {
-    console.error('Failed to register global shortcut:', error);
-    // Show error in main window
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('shortcut-error', error.message);
-    }
-  }
-
-  // Handle app activation
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createMainWindow();
-    } else if (mainWindow && !mainWindow.isVisible()) {
-      mainWindow.show();
-    }
-  });
-});
-
-// Prevent default behavior of closing app when all windows are closed
-app.on('window-all-closed', (e) => {
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
-});
-
-// Clean up when app is about to quit
-app.on('will-quit', () => {
-  app.isQuitting = true;
-
-  // Unregister shortcuts
-  globalShortcut.unregisterAll();
-
-  // Stop recording if active
+/**
+ * User Input Handling
+ */
+function toggleRecording() {
   if (isRecording) {
     stopRecording();
+  } else {
+    startRecording();
+  }
+}
+
+/**
+ * IPC Handlers
+ */
+function setupIPCHandlers() {
+  // Receive audio data from renderer
+  ipcMain.handle('audio-data', async (event, audioBuffer) => {
+    try {
+      const transcription = await transcribeAudio(audioBuffer);
+      return { success: true, transcription };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  // API key management
+  ipcMain.handle('set-api-key', (event, key) => {
+    store.set('apiKey', key);
+    return true;
+  });
+
+  ipcMain.handle('get-api-key', () => {
+    return store.get('apiKey') || '';
+  });
+
+  // Shortcut management
+  ipcMain.handle('set-shortcut', (event, shortcut) => {
+    try {
+      // Unregister existing shortcut
+      globalShortcut.unregisterAll();
+
+      // Register new shortcut
+      globalShortcut.register(shortcut, toggleRecording);
+
+      // Save to store
+      store.set('shortcut', shortcut);
+      return true;
+    } catch (error) {
+      console.error('Error setting shortcut:', error);
+      return false;
+    }
+  });
+
+  ipcMain.handle('get-shortcut', () => {
+    return store.get('shortcut') || 'CommandOrControl+Shift+Space';
+  });
+
+  // Audio level updates from renderer
+  ipcMain.handle('audio-level', (event, level) => {
+    if (overlayWindow && !overlayWindow.isDestroyed()) {
+      overlayWindow.webContents.send('audio-level', level);
+    }
+    return true;
+  });
+}
+
+/**
+ * App Lifecycle Management
+ */
+function initialize() {
+  // Create temp directory if it doesn't exist
+  if (!fs.existsSync(tempDir)) {
+    fs.mkdirSync(tempDir, { recursive: true });
   }
 
-  // Close windows
-  if (overlayWindow && !overlayWindow.isDestroyed()) {
-    overlayWindow.close();
-    overlayWindow = null;
-  }
-});
+  // Set up IPC handlers
+  setupIPCHandlers();
+
+  // When app is ready
+  app.whenReady().then(() => {
+    try {
+      // Create main window first
+      createMainWindow();
+
+      // Create tray icon
+      createTray();
+
+      // Register global shortcut
+      const shortcut = store.get('shortcut') || 'CommandOrControl+Shift+Space';
+      globalShortcut.register(shortcut, toggleRecording);
+
+      // Handle app activation
+      app.on('activate', () => {
+        if (BrowserWindow.getAllWindows().length === 0) {
+          createMainWindow();
+        } else if (mainWindow && !mainWindow.isVisible()) {
+          mainWindow.show();
+        }
+      });
+    } catch (error) {
+      console.error('Error initializing app:', error);
+    }
+  });
+
+  // Prevent default behavior of closing app when all windows are closed
+  app.on('window-all-closed', (e) => {
+    if (process.platform !== 'darwin') {
+      app.quit();
+    }
+  });
+
+  // Clean up when app is about to quit
+  app.on('will-quit', () => {
+    app.isQuitting = true;
+
+    // Unregister shortcuts
+    globalShortcut.unregisterAll();
+
+    // Stop recording if active
+    if (isRecording) {
+      stopRecording();
+    }
+
+    // Close windows
+    closeOverlayWindow();
+  });
+}
+
+// Start the app
+initialize();

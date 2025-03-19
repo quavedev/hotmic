@@ -9,7 +9,7 @@
       margin: 0;
       padding: 0;
       background-color: transparent;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, sans-serif;
       overflow: hidden;
       user-select: none;
       display: flex;
@@ -167,40 +167,53 @@
   </div>
 
   <script>
+    /**
+     * Whisper Transcriber Overlay
+     *
+     * Handles audio recording and displays visual feedback
+     * for recording and transcription processes.
+     */
+
     // DOM elements
-    const recordingIndicator = document.querySelector('.recording-indicator');
-    const audioLevelFill = document.querySelector('.audio-level-fill');
-    const statusMessage = document.querySelector('.status-message');
-    const timeDisplay = document.querySelector('.time-display');
-    const progressBar = document.querySelector('.progress-bar');
-    const progressBarFill = document.querySelector('.progress-bar-fill');
-    const spinner = document.querySelector('.spinner');
-    const transcriptionIcon = document.querySelector('.transcription-icon');
+    const elements = {
+      recordingIndicator: document.querySelector('.recording-indicator'),
+      audioLevelFill: document.querySelector('.audio-level-fill'),
+      statusMessage: document.querySelector('.status-message'),
+      timeDisplay: document.querySelector('.time-display'),
+      progressBar: document.querySelector('.progress-bar'),
+      progressBarFill: document.querySelector('.progress-bar-fill'),
+      spinner: document.querySelector('.spinner'),
+      transcriptionIcon: document.querySelector('.transcription-icon')
+    };
 
-    // Recording state
-    let isRecording = false;
-    let recordingStartTime = null;
-    let recordingInterval = null;
-    let mediaRecorder = null;
-    let audioData = [];
+    // Application state
+    const state = {
+      isRecording: false,
+      recordingStartTime: null,
+      recordingInterval: null,
+      audioContext: null,
+      analyser: null,
+      dataArray: null,
+      mediaRecorder: null,
+      audioData: []
+    };
 
-    // Audio context for level monitoring
-    let audioContext = null;
-    let analyser = null;
-    let dataArray = null;
+    /**
+     * Recording functionality
+     */
 
-    // Update recording time
-    function updateTime() {
-      if (!recordingStartTime) return;
+    // Update recording time display
+    function updateTimeDisplay() {
+      if (!state.recordingStartTime) return;
 
-      const elapsed = Date.now() - recordingStartTime;
+      const elapsed = Date.now() - state.recordingStartTime;
       const seconds = Math.floor((elapsed / 1000) % 60);
       const minutes = Math.floor((elapsed / 1000 / 60) % 60);
 
-      timeDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+      elements.timeDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
     }
 
-    // Calculate audio level
+    // Calculate audio level from analyzer data
     function calculateAudioLevel(array) {
       let sum = 0;
       for (let i = 0; i < array.length; i++) {
@@ -209,143 +222,172 @@
       return sum / array.length;
     }
 
-    // Monitor audio levels
+    // Monitor and display audio levels
     function monitorAudioLevel() {
-      if (!analyser) return;
+      if (!state.analyser) return;
 
-      analyser.getByteFrequencyData(dataArray);
-      const level = calculateAudioLevel(dataArray);
+      state.analyser.getByteFrequencyData(state.dataArray);
+      const level = calculateAudioLevel(state.dataArray);
 
       // Update UI
-      audioLevelFill.style.width = `${level * 100}%`;
+      elements.audioLevelFill.style.width = `${level * 100}%`;
 
       // Send to main process
       window.api.sendAudioLevel(level);
 
-      // Schedule next update
+      // Continue monitoring
       requestAnimationFrame(monitorAudioLevel);
     }
 
-    // Start recording
+    // Start audio recording
     async function startRecording() {
       try {
         // Reset state
-        isRecording = true;
-        audioData = [];
-        recordingStartTime = Date.now();
+        state.isRecording = true;
+        state.audioData = [];
+        state.recordingStartTime = Date.now();
 
-        // Update UI
-        recordingIndicator.style.display = 'block';
-        transcriptionIcon.style.display = 'none';
-        spinner.style.display = 'none';
-        progressBar.style.display = 'none';
-        audioLevelFill.style.width = '0%';
-        statusMessage.textContent = 'Recording...';
+        // Update UI for recording state
+        setRecordingUI();
 
         // Start timer
-        recordingInterval = setInterval(updateTime, 1000);
-        updateTime();
+        state.recordingInterval = setInterval(updateTimeDisplay, 1000);
+        updateTimeDisplay();
 
         // Get audio stream
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
         // Setup audio context for level monitoring
-        audioContext = new AudioContext();
-        const source = audioContext.createMediaStreamSource(stream);
-        analyser = audioContext.createAnalyser();
-        analyser.fftSize = 256;
-        source.connect(analyser);
-        dataArray = new Uint8Array(analyser.frequencyBinCount);
-
-        // Start monitoring audio levels
-        monitorAudioLevel();
+        setupAudioAnalyzer(stream);
 
         // Setup media recorder
-        mediaRecorder = new MediaRecorder(stream);
-
-        mediaRecorder.ondataavailable = (event) => {
-          if (event.data.size > 0) {
-            audioData.push(event.data);
-          }
-        };
-
-        mediaRecorder.onstop = async () => {
-          // Convert to blob then to array buffer
-          const blob = new Blob(audioData, { type: 'audio/wav' });
-          const arrayBuffer = await blob.arrayBuffer();
-
-          // Clean up
-          stream.getTracks().forEach(track => track.stop());
-
-          // Show processing UI
-          recordingIndicator.style.display = 'none';
-          spinner.style.display = 'block';
-          progressBar.style.display = 'block';
-          statusMessage.textContent = 'Processing...';
-
-          // Send to main process
-          window.api.sendAudioData(arrayBuffer);
-        };
+        setupMediaRecorder(stream);
 
         // Start recording
-        mediaRecorder.start();
+        state.mediaRecorder.start();
       } catch (error) {
         console.error('Recording error:', error);
-        statusMessage.textContent = `Error: ${error.message}`;
+        elements.statusMessage.textContent = `Error: ${error.message}`;
       }
+    }
+
+    // Set up audio analyzer for level monitoring
+    function setupAudioAnalyzer(stream) {
+      state.audioContext = new AudioContext();
+      const source = state.audioContext.createMediaStreamSource(stream);
+      state.analyser = state.audioContext.createAnalyser();
+      state.analyser.fftSize = 256;
+      source.connect(state.analyser);
+      state.dataArray = new Uint8Array(state.analyser.frequencyBinCount);
+
+      // Start monitoring audio levels
+      monitorAudioLevel();
+    }
+
+    // Set up media recorder
+    function setupMediaRecorder(stream) {
+      state.mediaRecorder = new MediaRecorder(stream);
+
+      state.mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          state.audioData.push(event.data);
+        }
+      };
+
+      state.mediaRecorder.onstop = async () => {
+        // Convert to blob then to array buffer
+        const blob = new Blob(state.audioData, { type: 'audio/wav' });
+        const arrayBuffer = await blob.arrayBuffer();
+
+        // Clean up
+        stream.getTracks().forEach(track => track.stop());
+
+        // Show processing UI
+        setProcessingUI();
+
+        // Send to main process
+        window.api.sendAudioData(arrayBuffer);
+      };
     }
 
     // Stop recording
     function stopRecording() {
-      if (!isRecording || !mediaRecorder) return;
+      if (!state.isRecording || !state.mediaRecorder) return;
 
-      isRecording = false;
+      state.isRecording = false;
 
       // Stop timer
-      clearInterval(recordingInterval);
+      clearInterval(state.recordingInterval);
 
       // Stop media recorder
-      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-        mediaRecorder.stop();
+      if (state.mediaRecorder && state.mediaRecorder.state !== 'inactive') {
+        state.mediaRecorder.stop();
       }
 
       // Stop audio context
-      if (audioContext) {
-        audioContext.close();
-        audioContext = null;
-        analyser = null;
+      if (state.audioContext) {
+        state.audioContext.close();
+        state.audioContext = null;
+        state.analyser = null;
       }
     }
 
-    // Handle transcription progress
+    /**
+     * UI State Management
+     */
+
+    // Set UI for recording state
+    function setRecordingUI() {
+      elements.recordingIndicator.style.display = 'block';
+      elements.transcriptionIcon.style.display = 'none';
+      elements.spinner.style.display = 'none';
+      elements.progressBar.style.display = 'none';
+      elements.audioLevelFill.style.width = '0%';
+      elements.statusMessage.textContent = 'Recording...';
+    }
+
+    // Set UI for processing state
+    function setProcessingUI() {
+      elements.recordingIndicator.style.display = 'none';
+      elements.spinner.style.display = 'block';
+      elements.progressBar.style.display = 'block';
+      elements.statusMessage.textContent = 'Processing...';
+    }
+
+    // Handle transcription progress updates
     function handleTranscriptionProgress(data) {
-      switch (data.step) {
-        case 'start':
-          statusMessage.textContent = 'Starting...';
-          progressBarFill.style.width = '10%';
-          break;
-        case 'api':
-          statusMessage.textContent = 'Sending to API...';
-          progressBarFill.style.width = '30%';
-          break;
-        case 'receiving':
-          statusMessage.textContent = 'Receiving data...';
-          progressBarFill.style.width = '70%';
-          break;
-        case 'complete':
-          statusMessage.textContent = 'Copied to clipboard!';
-          progressBarFill.style.width = '100%';
-          spinner.style.display = 'none';
-          transcriptionIcon.style.display = 'block';
-          break;
-        case 'error':
-          statusMessage.textContent = data.message;
-          break;
+      const progressMap = {
+        'start': { text: 'Starting...', progress: 10 },
+        'api': { text: 'Sending to API...', progress: 30 },
+        'receiving': { text: 'Receiving data...', progress: 70 },
+        'complete': { text: 'Copied to clipboard!', progress: 100 },
+        'error': { text: data.message, progress: 100 }
+      };
+
+      const progressInfo = progressMap[data.step] || { text: 'Processing...', progress: 50 };
+
+      // Update UI
+      elements.statusMessage.textContent = progressInfo.text;
+      elements.progressBarFill.style.width = `${progressInfo.progress}%`;
+
+      // For completion, show checkmark instead of spinner
+      if (data.step === 'complete') {
+        elements.spinner.style.display = 'none';
+        elements.transcriptionIcon.style.display = 'block';
+      }
+
+      // For error, change colors
+      if (data.step === 'error') {
+        elements.progressBarFill.style.backgroundColor = '#ff3b30';
       }
     }
+
+    /**
+     * Event Handlers
+     */
 
     // Register event listeners
-    window.addEventListener('DOMContentLoaded', () => {
+    function registerEventListeners() {
       // Listen for start recording event
       window.api.onStartRecording(() => {
         startRecording();
@@ -358,12 +400,15 @@
 
       // Listen for audio level events (from other windows)
       window.api.onAudioLevel((level) => {
-        audioLevelFill.style.width = `${level * 100}%`;
+        elements.audioLevelFill.style.width = `${level * 100}%`;
       });
 
       // Listen for transcription progress
       window.api.onTranscriptionProgress(handleTranscriptionProgress);
-    });
+    }
+
+    // Initialize when DOM is loaded
+    document.addEventListener('DOMContentLoaded', registerEventListeners);
   </script>
 </body>
 
