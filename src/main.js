@@ -114,7 +114,6 @@ async function postProcessTranscript(text) {
     const data = await response.json();
     return data.choices[0].message.content;
   } catch (error) {
-    console.error('Post-processing error:', error);
     updateTranscriptionProgress('error', 'Post-processing failed, using raw transcript');
     return text;
   }
@@ -131,7 +130,6 @@ async function transcribeAudio(audioBuffer) {
 
   let tempFile = null;
   try {
-    console.log('Transcribing audio...');
     updateTranscriptionProgress('start', 'Starting transcription...');
 
     // Save audio to temp file
@@ -153,14 +151,12 @@ async function transcribeAudio(audioBuffer) {
     // Copy processed version to clipboard
     updateTranscriptionProgress('complete', 'Processing complete');
     clipboard.writeText(processedTranscript);
-    console.log('Processed transcript copied to clipboard');
 
     // Close overlay after a delay
     setTimeout(() => closeOverlayWindow(), 1500);
 
     return processedTranscript;
   } catch (error) {
-    console.error('Transcription error:', error);
     updateTranscriptionProgress('error', `Error: ${error.message}`);
 
     // Close overlay after a delay
@@ -284,8 +280,6 @@ function createTray() {
 
     tray.setToolTip('Whisper Transcriber');
     tray.setContextMenu(contextMenu);
-
-    console.log('Tray created successfully');
   } catch (error) {
     console.error('Error creating tray:', error);
   }
@@ -577,8 +571,6 @@ function closeOverlayWindow() {
  * Recording Management
  */
 function startRecording() {
-  console.log('Starting recording...');
-
   if (isRecording) return;
 
   isRecording = true;
@@ -594,8 +586,6 @@ function startRecording() {
 }
 
 function stopRecording() {
-  console.log('Stopping recording...');
-
   if (!isRecording) return;
 
   isRecording = false;

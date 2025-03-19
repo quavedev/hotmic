@@ -539,7 +539,6 @@
         // Start recording
         state.mediaRecorder.start();
       } catch (error) {
-        console.error('Recording error:', error);
         elements.statusMessage.textContent = `Error: ${error.message}`;
       }
     }
