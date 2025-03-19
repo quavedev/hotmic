@@ -29,6 +29,9 @@ if (!fs.existsSync(tempDir)) {
   fs.mkdirSync(tempDir, { recursive: true });
 }
 
+// Default prompt for email formatting
+const DEFAULT_PROMPT = 'Please format this transcript as a professional email with a greeting and sign-off. Make it concise and clear while maintaining the key information.';
+
 /**
  * Application State
  */
@@ -39,122 +42,81 @@ let isRecording = false;
 let audioData = [];
 
 /**
- * Window Management
+ * History Management
  */
-function createMainWindow() {
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.show();
-    return;
-  }
-
-  mainWindow = new BrowserWindow({
-    width: 600,
-    height: 400,
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-    },
-    show: false,
-    skipTaskbar: true,
-    title: 'Whisper Transcriber'
-  });
-
-  mainWindow.loadFile(path.join(__dirname, '../public/index.html'));
-
-  // Hide instead of close
-  mainWindow.on('close', (event) => {
-    if (!app.isQuitting) {
-      event.preventDefault();
-      mainWindow.hide();
-      return false;
-    }
-  });
-
-  mainWindow.once('ready-to-show', () => {
-    // Only show on first launch or if API key isn't set
-    if (!store.get('apiKey')) {
-      mainWindow.show();
-    }
-  });
+function cleanupOldHistory() {
+  const history = store.get('history', []);
+  const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+  const newHistory = history.filter(item => item.timestamp > thirtyDaysAgo);
+  store.set('history', newHistory);
 }
 
-function createOverlayWindow() {
-  // Close existing overlay if any
-  closeOverlayWindow();
-
-  // Get screen dimensions to center the overlay
-  const { screen } = require('electron');
-  const primaryDisplay = screen.getPrimaryDisplay();
-  const { width, height } = primaryDisplay.workAreaSize;
-
-  overlayWindow = new BrowserWindow({
-    width: 340,
-    height: 340,
-    x: Math.floor(width / 2 - 150),
-    y: Math.floor(height / 2 - 150),
-    frame: false,
-    transparent: true,
-    backgroundColor: '#00000000',
-    opacity: 1.0,
-    hasShadow: false,
-    resizable: false,
-    skipTaskbar: true,
-    alwaysOnTop: true,
-    show: false,
-    titleBarStyle: 'hidden',
-    vibrancy: null,
-    visualEffectState: 'active',
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      backgroundThrottling: false
-    }
+function addToHistory(rawText, processedText) {
+  const history = store.get('history', []);
+  history.push({
+    timestamp: Date.now(),
+    rawText,
+    processedText
   });
-
-  overlayWindow.loadFile(path.join(__dirname, '../public/overlay.html'));
-
-  overlayWindow.once('ready-to-show', () => {
-    overlayWindow.show();
-  });
-}
-
-function closeOverlayWindow() {
-  if (overlayWindow && !overlayWindow.isDestroyed()) {
-    overlayWindow.close();
-    overlayWindow = null;
-  }
+  store.set('history', history);
+  cleanupOldHistory();
 }
 
 /**
- * Recording Management
+ * Post-Processing with Groq
  */
-function startRecording() {
-  console.log('Starting recording...');
-
-  if (isRecording) return;
-
-  isRecording = true;
-  audioData = [];
-
-  // Show overlay window
-  createOverlayWindow();
-
-  // Start recording in overlay
-  if (overlayWindow && !overlayWindow.isDestroyed()) {
-    overlayWindow.webContents.send('start-recording');
+async function postProcessTranscript(text) {
+  const apiKey = store.get('apiKey');
+  if (!apiKey) {
+    throw new Error('API key not set');
   }
-}
 
-function stopRecording() {
-  console.log('Stopping recording...');
+  const promptSettings = store.get('promptSettings', {
+    enabled: true,
+    prompt: DEFAULT_PROMPT
+  });
 
-  if (!isRecording) return;
+  if (!promptSettings.enabled) {
+    return text;
+  }
 
-  isRecording = false;
+  try {
+    updateTranscriptionProgress('processing', 'Post-processing with Groq...');
 
-  // Tell overlay to stop recording
-  if (overlayWindow && !overlayWindow.isDestroyed()) {
-    overlayWindow.webContents.send('stop-recording');
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+          {
+            role: 'system',
+            content: promptSettings.prompt
+          },
+          {
+            role: 'user',
+            content: text
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 4096
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(`Groq API error: ${response.statusText}${errorData.error ? ' - ' + errorData.error.message : ''}`);
+    }
+
+    const data = await response.json();
+    return data.choices[0].message.content;
+  } catch (error) {
+    console.error('Post-processing error:', error);
+    updateTranscriptionProgress('error', 'Post-processing failed, using raw transcript');
+    return text;
   }
 }
 
@@ -178,18 +140,25 @@ async function transcribeAudio(audioBuffer) {
 
     updateTranscriptionProgress('api', 'Sending to Groq API...');
 
-    // Send to Groq API
-    const result = await sendToGroqAPI(apiKey, tempFile);
+    // Send to Groq API for transcription
+    const rawTranscript = await sendToGroqAPI(apiKey, tempFile);
 
-    // Copy to clipboard and notify
-    updateTranscriptionProgress('complete', 'Transcription complete');
-    clipboard.writeText(result);
-    console.log('Transcription copied to clipboard');
+    // Post-process with Groq if enabled
+    updateTranscriptionProgress('processing', 'Post-processing transcript...');
+    const processedTranscript = await postProcessTranscript(rawTranscript);
+
+    // Add to history
+    addToHistory(rawTranscript, processedTranscript);
+
+    // Copy processed version to clipboard
+    updateTranscriptionProgress('complete', 'Processing complete');
+    clipboard.writeText(processedTranscript);
+    console.log('Processed transcript copied to clipboard');
 
     // Close overlay after a delay
     setTimeout(() => closeOverlayWindow(), 1500);
 
-    return result;
+    return processedTranscript;
   } catch (error) {
     console.error('Transcription error:', error);
     updateTranscriptionProgress('error', `Error: ${error.message}`);
@@ -402,6 +371,25 @@ function setupIPCHandlers() {
     }
     return true;
   });
+
+  // Prompt settings
+  ipcMain.handle('get-prompt-settings', () => {
+    return store.get('promptSettings', {
+      enabled: true,
+      prompt: DEFAULT_PROMPT
+    });
+  });
+
+  ipcMain.handle('set-prompt-settings', (event, settings) => {
+    store.set('promptSettings', settings);
+    return true;
+  });
+
+  // History management
+  ipcMain.handle('get-history', () => {
+    cleanupOldHistory();
+    return store.get('history', []);
+  });
 }
 
 /**
@@ -475,6 +463,126 @@ function initialize() {
     // Close windows
     closeOverlayWindow();
   });
+}
+
+/**
+ * Window Management
+ */
+function createMainWindow() {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.show();
+    return;
+  }
+
+  mainWindow = new BrowserWindow({
+    width: 600,
+    height: 400,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+    },
+    show: false,
+    skipTaskbar: true,
+    title: 'Whisper Transcriber'
+  });
+
+  mainWindow.loadFile(path.join(__dirname, '../public/index.html'));
+
+  // Hide instead of close
+  mainWindow.on('close', (event) => {
+    if (!app.isQuitting) {
+      event.preventDefault();
+      mainWindow.hide();
+      return false;
+    }
+  });
+
+  mainWindow.once('ready-to-show', () => {
+    // Only show on first launch or if API key isn't set
+    if (!store.get('apiKey')) {
+      mainWindow.show();
+    }
+  });
+}
+
+function createOverlayWindow() {
+  // Close existing overlay if any
+  closeOverlayWindow();
+
+  // Get screen dimensions to center the overlay
+  const { screen } = require('electron');
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width, height } = primaryDisplay.workAreaSize;
+
+  overlayWindow = new BrowserWindow({
+    width: 340,
+    height: 340,
+    x: Math.floor(width / 2 - 150),
+    y: Math.floor(height / 2 - 150),
+    frame: false,
+    transparent: true,
+    backgroundColor: '#00000000',
+    opacity: 1.0,
+    hasShadow: false,
+    resizable: false,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    show: false,
+    titleBarStyle: 'hidden',
+    vibrancy: null,
+    visualEffectState: 'active',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      backgroundThrottling: false
+    }
+  });
+
+  overlayWindow.loadFile(path.join(__dirname, '../public/overlay.html'));
+
+  overlayWindow.once('ready-to-show', () => {
+    overlayWindow.show();
+  });
+}
+
+function closeOverlayWindow() {
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
+    overlayWindow.close();
+    overlayWindow = null;
+  }
+}
+
+/**
+ * Recording Management
+ */
+function startRecording() {
+  console.log('Starting recording...');
+
+  if (isRecording) return;
+
+  isRecording = true;
+  audioData = [];
+
+  // Show overlay window
+  createOverlayWindow();
+
+  // Start recording in overlay
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
+    overlayWindow.webContents.send('start-recording');
+  }
+}
+
+function stopRecording() {
+  console.log('Stopping recording...');
+
+  if (!isRecording) return;
+
+  isRecording = false;
+
+  // Tell overlay to stop recording
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
+    overlayWindow.webContents.send('stop-recording');
+  }
 }
 
 // Start the app
