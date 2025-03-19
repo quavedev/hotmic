@@ -1,37 +1,44 @@
 {
   "name": "whisper-transcriber",
   "version": "1.0.0",
-  "description": "Desktop app for transcribing audio using Groq API and Whisper",
+  "description": "Desktop app for audio transcription using Groq API and Whisper model",
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",
     "build": "electron-builder",
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "postinstall": "electron-builder install-app-deps"
+    "build:mac": "electron-builder --mac",
+    "build:win": "electron-builder --win",
+    "build:linux": "electron-builder --linux"
   },
   "author": "",
-  "license": "ISC",
-  "dependencies": {
-    "electron-store": "^8.1.0",
-    "form-data": "^4.0.2",
-    "groq-sdk": "^0.3.0",
-    "node-fetch": "^2.7.0"
-  },
-  "optionalDependencies": {
-  },
+  "license": "MIT",
   "devDependencies": {
-    "electron": "^28.1.0",
-    "electron-builder": "^24.6.4",
-    "electron-rebuild": "^3.2.7"
+    "electron": "^29.0.0",
+    "electron-builder": "^24.9.1"
+  },
+  "dependencies": {
+    "electron-store": "^10.0.1",
+    "form-data": "^4.0.0"
   },
   "build": {
-    "appId": "com.whispertranscriber.app",
+    "appId": "com.example.whisper-transcriber",
+    "productName": "Whisper Transcriber",
+    "files": [
+      "src/**/*",
+      "public/**/*",
+      "package.json"
+    ],
     "mac": {
-      "category": "public.app-category.utilities"
+      "category": "public.app-category.productivity",
+      "target": "dmg"
     },
-    "extraResources": [
-      "public/icons/**"
-    ]
+    "win": {
+      "target": "nsis"
+    },
+    "linux": {
+      "target": "AppImage",
+      "category": "Utility"
+    }
   }
 }

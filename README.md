@@ -1,74 +1,51 @@
 # Whisper Transcriber
 
-A macOS desktop application for transcribing audio using the Groq API and Whisper model. This app allows you to transcribe speech from your microphone and automatically copy it to your clipboard for pasting into any text field.
+A lightweight desktop application that transcribes audio using the Groq API and Whisper-large-v3 model.
 
 ## Features
 
-- Record audio from your microphone with a simple click or global keyboard shortcut (Cmd+Shift+Space)
-- Transcribe speech using Groq's Speech-to-Text API with the Whisper model
-- Automatically copy transcriptions to your clipboard
-- System tray integration for easy access
-- Persistent API key storage
-- No external dependencies - uses browser's built-in Web Audio API
+- Press a global shortcut to start/stop recording
+- Audio is sent to Groq API for transcription
+- Results are automatically copied to clipboard
+- Visual feedback during recording and processing
+- Configurable keyboard shortcut
 
-## Requirements
+## Setup
 
-- macOS 
-- Node.js (v14 or higher)
-- Groq API key (get one from [Groq Console](https://console.groq.com/keys))
-- Microphone access on your computer
+1. Clone this repository
+2. Install dependencies:
+   ```
+   npm install
+   ```
+3. Run the application:
+   ```
+   npm start
+   ```
 
-## Installation
+## Configuration
 
-1. Clone this repository:
-```
-git clone https://github.com/your-username/whisper-transcriber.git
-cd whisper-transcriber
-```
-
-2. Install Node.js dependencies:
-```
-npm install
-```
-
-3. Start the application:
-```
-npm start
-```
+1. Sign up for a Groq API account at [https://console.groq.com](https://console.groq.com)
+2. Get an API key
+3. Enter your API key in the app settings
 
 ## Usage
 
-1. Launch the application
-2. Enter your Groq API key in the settings section
-3. Click "Start Recording" or use the global shortcut `Cmd+Shift+Space` to start recording
-4. Speak clearly into your microphone
-5. The app will automatically stop recording after 30 seconds or when you click "Stop Recording"
-6. The transcribed text will be copied to your clipboard and can be pasted into any text field
+1. Press the configured global shortcut (default: Ctrl+Shift+Space) to start recording
+2. Speak into your microphone
+3. Press the shortcut again to stop recording and begin transcription
+4. Once transcription is complete, the text will be copied to your clipboard
 
-## Building for Distribution
+## Development
 
-To create a distributable version of the app:
+- Run with developer tools: `npm run dev`
+- Build distribution: `npm run build`
 
-```
-npm run build
-```
+## Dependencies
 
-This will create a distributable package in the `dist` directory.
-
-## Permissions
-
-This app requires the following permissions:
-
-- Microphone access (for recording audio)
-- Accessibility access (for pasting text)
-
-## Technologies Used
-
-- Electron.js - Cross-platform desktop app framework
-- Groq API - For accessing the Whisper large language model
-- Node.js - JavaScript runtime
-- node-record-lpcm16 - For recording audio
+- Electron
+- Electron Store
+- Form Data
 
 ## License
 
-ISC
+MIT

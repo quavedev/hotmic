@@ -1,378 +1,370 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
+
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Recording</title>
   <style>
-    :root {
-      --background-color: rgba(28, 28, 30, 0.85);
-      --text-color: rgba(255, 255, 255, 0.9);
-      --accent-color: #0071e3;
-      --record-color: #ff3b30;
-    }
-
-    @media (prefers-color-scheme: light) {
-      :root {
-        --background-color: rgba(242, 242, 247, 0.85);
-        --text-color: rgba(0, 0, 0, 0.9);
-        --accent-color: #0071e3;
-        --record-color: #ff3b30;
-      }
-    }
-
     body {
       margin: 0;
       padding: 0;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-      -webkit-app-region: drag;
-      user-select: none;
+      background-color: transparent;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
       overflow: hidden;
+      user-select: none;
       display: flex;
       justify-content: center;
       align-items: center;
-      width: 100vw;
       height: 100vh;
-      background-color: transparent;
     }
 
     .overlay-container {
-      width: 280px;
-      height: 280px;
-      border-radius: 24px;
-      background-color: var(--background-color);
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+      width: 200px;
+      height: 200px;
+      border-radius: 50%;
+      background-color: rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(10px);
       display: flex;
       flex-direction: column;
       justify-content: center;
       align-items: center;
+      color: white;
+      text-align: center;
+      padding: 10px;
+      box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
       position: relative;
       overflow: hidden;
-      transition: opacity 0.3s ease-in-out;
-      opacity: 0;
     }
 
-    .overlay-container.show {
-      opacity: 1;
-    }
-
-    .recording-circle {
-      width: 120px;
-      height: 120px;
-      background-color: var(--accent-color);
+    .recording-indicator {
+      width: 20px;
+      height: 20px;
       border-radius: 50%;
-      margin-bottom: 20px;
-      position: relative;
-      overflow: hidden;
-      display: flex;
-      justify-content: center;
-      align-items: center;
+      background-color: #ff3b30;
+      margin-bottom: 10px;
+      animation: pulse 1.5s infinite;
     }
 
-    .recording-circle.active {
-      background-color: var(--record-color);
-    }
-
-    .status-text {
-      color: var(--text-color);
-      font-size: 18px;
-      font-weight: 500;
-      margin-top: 10px;
-    }
-
-    .timer {
-      color: var(--text-color);
-      font-size: 14px;
-      margin-top: 5px;
-      font-variant-numeric: tabular-nums;
-    }
-
-    .wave-container {
-      position: absolute;
-      width: 100%;
-      height: 100%;
-      top: 0;
-      left: 0;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-    }
-
-    .wave {
-      position: absolute;
-      width: 150px;
-      height: 150px;
+    .audio-level {
+      width: 160px;
+      height: 6px;
       background-color: rgba(255, 255, 255, 0.2);
-      border-radius: 50%;
-      transform: scale(0);
-      opacity: 0;
+      border-radius: 3px;
+      margin: 10px 0;
+      overflow: hidden;
     }
 
-    @keyframes wave-animation {
+    .audio-level-fill {
+      height: 100%;
+      width: 0%;
+      background-color: #34c759;
+      border-radius: 3px;
+      transition: width 0.1s ease-out;
+    }
+
+    .status-message {
+      font-size: 14px;
+      margin: 5px 0;
+      height: 20px;
+    }
+
+    .time-display {
+      font-size: 24px;
+      font-weight: bold;
+      margin: 10px 0;
+    }
+
+    .progress-bar {
+      width: 160px;
+      height: 6px;
+      background-color: rgba(255, 255, 255, 0.2);
+      border-radius: 3px;
+      margin: 10px 0;
+      display: none;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      width: 0%;
+      background-color: #007aff;
+      border-radius: 3px;
+      transition: width 0.3s ease;
+    }
+
+    @keyframes pulse {
       0% {
-        transform: scale(0);
-        opacity: 0.7;
-      }
-      100% {
+        opacity: 1;
         transform: scale(1);
+      }
+
+      50% {
+        opacity: 0.5;
+        transform: scale(1.1);
+      }
+
+      100% {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+
+    .transcription-icon {
+      font-size: 24px;
+      margin-bottom: 10px;
+      display: none;
+    }
+
+    .fade-out {
+      animation: fadeOut 0.5s forwards;
+    }
+
+    @keyframes fadeOut {
+      from {
+        opacity: 1;
+      }
+
+      to {
         opacity: 0;
       }
     }
 
-    .mic-icon {
-      width: 40px;
-      height: 40px;
-      fill: white;
-      z-index: 2;
-    }
-
-    .close-btn {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      width: 24px;
-      height: 24px;
-      display: flex;
-      justify-content: center;
-      align-items: center;
+    .spinner {
+      display: none;
+      width: 30px;
+      height: 30px;
+      border: 3px solid rgba(255, 255, 255, 0.3);
       border-radius: 50%;
-      background-color: rgba(255, 255, 255, 0.2);
-      color: var(--text-color);
-      cursor: pointer;
-      -webkit-app-region: no-drag;
-      opacity: 0.6;
-      transition: opacity 0.2s;
+      border-top-color: white;
+      animation: spin 1s linear infinite;
+      margin-bottom: 10px;
     }
 
-    .close-btn:hover {
-      opacity: 1;
+    @keyframes spin {
+      0% {
+        transform: rotate(0deg);
+      }
+
+      100% {
+        transform: rotate(360deg);
+      }
     }
   </style>
 </head>
+
 <body>
   <div class="overlay-container">
-    <div class="close-btn">✕</div>
-    <div class="recording-circle">
-      <div class="wave-container">
-        <div class="wave" id="wave1"></div>
-        <div class="wave" id="wave2"></div>
-        <div class="wave" id="wave3"></div>
-      </div>
-      <svg class="mic-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-        <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
-        <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
-      </svg>
+    <div class="recording-indicator"></div>
+    <div class="spinner"></div>
+    <div class="transcription-icon">📝</div>
+    <div class="time-display">00:00</div>
+    <div class="audio-level">
+      <div class="audio-level-fill"></div>
     </div>
-    <div class="status-text">Recording...</div>
-    <div class="timer">0:00</div>
+    <div class="status-message">Recording...</div>
+    <div class="progress-bar">
+      <div class="progress-bar-fill"></div>
+    </div>
   </div>
 
   <script>
-    // DOM Elements
-    const container = document.querySelector('.overlay-container');
-    const recordingCircle = document.querySelector('.recording-circle');
-    const closeBtn = document.querySelector('.close-btn');
-    const wave1 = document.getElementById('wave1');
-    const wave2 = document.getElementById('wave2');
-    const wave3 = document.getElementById('wave3');
-    const timerElement = document.querySelector('.timer');
-    
-    // State
-    let isRecording = true; // Start as recording since overlay is shown during recording
-    let startTime = null;
-    let timerInterval = null;
-    let waveInterval = null;
-    console.log("Overlay window created - initial state: recording=true");
-    
-    // Handle ESC key to close window and cancel recording
-    document.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape') {
-        console.log("ESC key pressed - canceling recording");
-        // Cancel recording
-        isRecording = false;
-        window.electronAPI.updateRecordingState(false);
-        
-        // Clean up UI
-        recordingCircle.classList.remove('active');
-        clearInterval(waveInterval);
-        clearInterval(timerInterval);
-        
-        // Fade out and close
-        container.classList.remove('show');
-        setTimeout(() => {
-          console.log("ESC key handler - closing window");
-          window.close();
-        }, 300);
+    // DOM elements
+    const recordingIndicator = document.querySelector('.recording-indicator');
+    const audioLevelFill = document.querySelector('.audio-level-fill');
+    const statusMessage = document.querySelector('.status-message');
+    const timeDisplay = document.querySelector('.time-display');
+    const progressBar = document.querySelector('.progress-bar');
+    const progressBarFill = document.querySelector('.progress-bar-fill');
+    const spinner = document.querySelector('.spinner');
+    const transcriptionIcon = document.querySelector('.transcription-icon');
+
+    // Recording state
+    let isRecording = false;
+    let recordingStartTime = null;
+    let recordingInterval = null;
+    let mediaRecorder = null;
+    let audioData = [];
+
+    // Audio context for level monitoring
+    let audioContext = null;
+    let analyser = null;
+    let dataArray = null;
+
+    // Update recording time
+    function updateTime() {
+      if (!recordingStartTime) return;
+
+      const elapsed = Date.now() - recordingStartTime;
+      const seconds = Math.floor((elapsed / 1000) % 60);
+      const minutes = Math.floor((elapsed / 1000 / 60) % 60);
+
+      timeDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    }
+
+    // Calculate audio level
+    function calculateAudioLevel(array) {
+      let sum = 0;
+      for (let i = 0; i < array.length; i++) {
+        sum += array[i] / 255;
       }
-    });
-    
-    // Initialize
-    document.addEventListener('DOMContentLoaded', () => {
-      // Show container with fade-in
-      setTimeout(() => {
-        container.classList.add('show');
-      }, 100);
-      
-      // Set up audio visualization (simulate for now)
-      setupWaveAnimation();
-      
-      // Start timer
-      startTimer();
-    });
-    
-    // Add event listeners
-    closeBtn.addEventListener('click', () => {
-      console.log("Close button clicked - canceling recording");
-      // Cancel recording
+      return sum / array.length;
+    }
+
+    // Monitor audio levels
+    function monitorAudioLevel() {
+      if (!analyser) return;
+
+      analyser.getByteFrequencyData(dataArray);
+      const level = calculateAudioLevel(dataArray);
+
+      // Update UI
+      audioLevelFill.style.width = `${level * 100}%`;
+
+      // Send to main process
+      window.api.sendAudioLevel(level);
+
+      // Schedule next update
+      requestAnimationFrame(monitorAudioLevel);
+    }
+
+    // Start recording
+    async function startRecording() {
+      try {
+        // Reset state
+        isRecording = true;
+        audioData = [];
+        recordingStartTime = Date.now();
+
+        // Update UI
+        recordingIndicator.style.display = 'block';
+        transcriptionIcon.style.display = 'none';
+        spinner.style.display = 'none';
+        progressBar.style.display = 'none';
+        audioLevelFill.style.width = '0%';
+        statusMessage.textContent = 'Recording...';
+
+        // Start timer
+        recordingInterval = setInterval(updateTime, 1000);
+        updateTime();
+
+        // Get audio stream
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+        // Setup audio context for level monitoring
+        audioContext = new AudioContext();
+        const source = audioContext.createMediaStreamSource(stream);
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 256;
+        source.connect(analyser);
+        dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+        // Start monitoring audio levels
+        monitorAudioLevel();
+
+        // Setup media recorder
+        mediaRecorder = new MediaRecorder(stream);
+
+        mediaRecorder.ondataavailable = (event) => {
+          if (event.data.size > 0) {
+            audioData.push(event.data);
+          }
+        };
+
+        mediaRecorder.onstop = async () => {
+          // Convert to blob then to array buffer
+          const blob = new Blob(audioData, { type: 'audio/wav' });
+          const arrayBuffer = await blob.arrayBuffer();
+
+          // Clean up
+          stream.getTracks().forEach(track => track.stop());
+
+          // Show processing UI
+          recordingIndicator.style.display = 'none';
+          spinner.style.display = 'block';
+          progressBar.style.display = 'block';
+          statusMessage.textContent = 'Processing...';
+
+          // Send to main process
+          window.api.sendAudioData(arrayBuffer);
+        };
+
+        // Start recording
+        mediaRecorder.start();
+      } catch (error) {
+        console.error('Recording error:', error);
+        statusMessage.textContent = `Error: ${error.message}`;
+      }
+    }
+
+    // Stop recording
+    function stopRecording() {
+      if (!isRecording || !mediaRecorder) return;
+
       isRecording = false;
-      window.electronAPI.updateRecordingState(false);
-      
-      // Clean up UI
-      recordingCircle.classList.remove('active');
-      clearInterval(waveInterval);
-      clearInterval(timerInterval);
-      
-      // Hide window with fade effect before closing
-      container.classList.remove('show');
-      setTimeout(() => {
-        console.log("Close button handler - closing window");
-        window.close();
-      }, 300);
-    });
-    
-    // Also handle window being closed or unloaded
-    window.addEventListener('beforeunload', () => {
-      // This ensures the main process knows recording has stopped
-      window.electronAPI.updateRecordingState(false);
-    });
-    
-    // Handle recording toggle from main process
-    window.electronAPI.onToggleRecording(() => {
-      console.log(`Overlay received toggle-recording. Current state: ${isRecording}`);
-      
-      // Toggle state
-      isRecording = !isRecording;
-      console.log(`Overlay new recording state: ${isRecording}`);
-      
-      if (isRecording) {
-        console.log("Overlay starting recording visualization");
-        recordingCircle.classList.add('active');
-        setupWaveAnimation();
-        startTimer();
-      } else {
-        console.log("Overlay stopping recording visualization");
-        recordingCircle.classList.remove('active');
-        clearInterval(waveInterval);
-        clearInterval(timerInterval);
-        
-        // Fade out and close the window
-        console.log("Overlay fading out");
-        container.classList.remove('show');
-        
-        // Close the window after animation
-        setTimeout(() => {
-          console.log("Overlay closing window");
-          window.close();
-        }, 300);
+
+      // Stop timer
+      clearInterval(recordingInterval);
+
+      // Stop media recorder
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
       }
-    });
-    
-    // Handle audio level updates from main process
-    const removeAudioLevelListener = window.electronAPI.onAudioLevel((level) => {
-      // Use audio level to adjust wave animations
-      triggerWaveWithLevel(level);
-    });
-    
-    // Clean up listeners when window closes
-    window.addEventListener('beforeunload', () => {
-      if (removeAudioLevelListener) removeAudioLevelListener();
-    });
-    
-    // Functions
-    function setupWaveAnimation() {
-      // Clear any existing interval
-      if (waveInterval) clearInterval(waveInterval);
-      
-      // Set recording circle to active
-      recordingCircle.classList.add('active');
-      
-      // Initialize wave animation with a subtle background pulse
-      let counter = 0;
-      const createWave = () => {
-        // Choose which wave element to animate
-        const wave = counter % 3 === 0 ? wave1 : counter % 3 === 1 ? wave2 : wave3;
-        
-        // Reset animation
-        wave.style.animation = 'none';
-        void wave.offsetWidth; // Trigger reflow
-        
-        // Apply a subtle background pulse
-        const duration = 1.5;
-        wave.style.animation = `wave-animation ${duration}s ease-out`;
-        wave.style.transform = `scale(0.5)`;
-        
-        counter++;
-      };
-      
-      // Start initial wave
-      createWave();
-      
-      // Set interval for continuous background waves (slower for subtle effect)
-      waveInterval = setInterval(createWave, 1500);
-    }
-    
-    // Last level timestamp to prevent too many waves
-    let lastWaveTime = 0;
-    
-    function triggerWaveWithLevel(level) {
-      // Don't trigger waves too often (throttle to 100ms)
-      const now = Date.now();
-      if (now - lastWaveTime < 100) return;
-      lastWaveTime = now;
-      
-      // Pick a wave element (cycle through them)
-      const waveIndex = Math.floor(Math.random() * 3);
-      const wave = waveIndex === 0 ? wave1 : waveIndex === 1 ? wave2 : wave3;
-      
-      // Reset animation
-      wave.style.animation = 'none';
-      void wave.offsetWidth; // Trigger reflow
-      
-      // Map level (0-1) to scale (0.5-1.0)
-      const strength = 0.5 + (level * 0.5);
-      
-      // Map level to animation speed (1.5-0.7s - higher levels are faster)
-      const duration = 1.5 - (level * 0.8);
-      
-      // Apply animation
-      wave.style.animation = `wave-animation ${duration}s ease-out`;
-      wave.style.transform = `scale(${strength})`;
-    }
-    
-    function startTimer() {
-      // Clear any existing interval
-      if (timerInterval) clearInterval(timerInterval);
-      
-      // Initialize timer
-      startTime = Date.now();
-      updateTimer();
-      
-      // Update timer every second
-      timerInterval = setInterval(updateTimer, 1000);
-    }
-    
-    function updateTimer() {
-      const elapsedSeconds = Math.floor((Date.now() - startTime) / 1000);
-      const minutes = Math.floor(elapsedSeconds / 60);
-      const seconds = elapsedSeconds % 60;
-      timerElement.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-      
-      // Auto close after 30 seconds
-      if (elapsedSeconds >= 30) {
-        window.electronAPI.updateRecordingState(false);
-        window.close();
+
+      // Stop audio context
+      if (audioContext) {
+        audioContext.close();
+        audioContext = null;
+        analyser = null;
       }
     }
+
+    // Handle transcription progress
+    function handleTranscriptionProgress(data) {
+      switch (data.step) {
+        case 'start':
+          statusMessage.textContent = 'Starting...';
+          progressBarFill.style.width = '10%';
+          break;
+        case 'api':
+          statusMessage.textContent = 'Sending to API...';
+          progressBarFill.style.width = '30%';
+          break;
+        case 'receiving':
+          statusMessage.textContent = 'Receiving data...';
+          progressBarFill.style.width = '70%';
+          break;
+        case 'complete':
+          statusMessage.textContent = 'Copied to clipboard!';
+          progressBarFill.style.width = '100%';
+          spinner.style.display = 'none';
+          transcriptionIcon.style.display = 'block';
+          break;
+        case 'error':
+          statusMessage.textContent = data.message;
+          break;
+      }
+    }
+
+    // Register event listeners
+    window.addEventListener('DOMContentLoaded', () => {
+      // Listen for start recording event
+      window.api.onStartRecording(() => {
+        startRecording();
+      });
+
+      // Listen for stop recording event
+      window.api.onStopRecording(() => {
+        stopRecording();
+      });
+
+      // Listen for audio level events (from other windows)
+      window.api.onAudioLevel((level) => {
+        audioLevelFill.style.width = `${level * 100}%`;
+      });
+
+      // Listen for transcription progress
+      window.api.onTranscriptionProgress(handleTranscriptionProgress);
+    });
   </script>
 </body>
+
 </html>

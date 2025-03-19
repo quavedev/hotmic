@@ -1,42 +1,32 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-contextBridge.exposeInMainWorld('electronAPI', {
+// Expose API to renderer
+contextBridge.exposeInMainWorld('api', {
   // Settings
-  saveApiKey: (key) => ipcRenderer.invoke('save-api-key', key),
   getApiKey: () => ipcRenderer.invoke('get-api-key'),
-  
-  // Shortcuts
-  getGlobalShortcut: () => ipcRenderer.invoke('get-global-shortcut'),
-  setGlobalShortcut: (shortcut) => ipcRenderer.invoke('set-global-shortcut', shortcut),
-  
-  // Recording and transcription
-  transcribeAudio: (base64Audio) => ipcRenderer.invoke('transcribe-audio', base64Audio),
-  updateRecordingState: (isRecording) => ipcRenderer.invoke('update-recording-state', isRecording),
+  setApiKey: (key) => ipcRenderer.invoke('set-api-key', key),
+  getShortcut: () => ipcRenderer.invoke('get-shortcut'),
+  setShortcut: (shortcut) => ipcRenderer.invoke('set-shortcut', shortcut),
+
+  // Recording
+  sendAudioData: (buffer) => ipcRenderer.invoke('audio-data', buffer),
   sendAudioLevel: (level) => ipcRenderer.invoke('audio-level', level),
-  
-  // Events from main to renderer
-  onToggleRecording: (callback) => {
-    ipcRenderer.on('toggle-recording', () => callback());
-    return () => ipcRenderer.removeAllListeners('toggle-recording');
+
+  // Events
+  onStartRecording: (callback) => {
+    ipcRenderer.on('start-recording', callback);
+    return () => ipcRenderer.removeListener('start-recording', callback);
   },
-  onRecordingStatus: (callback) => {
-    ipcRenderer.on('recording-status', (_, value) => callback(value));
-    return () => ipcRenderer.removeAllListeners('recording-status');
-  },
-  onTranscriptionComplete: (callback) => {
-    ipcRenderer.on('transcription-complete', (_, text) => callback(text));
-    return () => ipcRenderer.removeAllListeners('transcription-complete');
-  },
-  onError: (callback) => {
-    ipcRenderer.on('error', (_, message) => callback(message));
-    return () => ipcRenderer.removeAllListeners('error');
-  },
-  onShortcutUpdated: (callback) => {
-    ipcRenderer.on('shortcut-updated', (_, shortcut) => callback(shortcut));
-    return () => ipcRenderer.removeAllListeners('shortcut-updated');
+  onStopRecording: (callback) => {
+    ipcRenderer.on('stop-recording', callback);
+    return () => ipcRenderer.removeListener('stop-recording', callback);
   },
   onAudioLevel: (callback) => {
     ipcRenderer.on('audio-level', (_, level) => callback(level));
-    return () => ipcRenderer.removeAllListeners('audio-level');
+    return () => ipcRenderer.removeListener('audio-level', callback);
+  },
+  onTranscriptionProgress: (callback) => {
+    ipcRenderer.on('transcription-progress', (_, data) => callback(data));
+    return () => ipcRenderer.removeListener('transcription-progress', callback);
   }
 });
