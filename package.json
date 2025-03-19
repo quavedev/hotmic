@@ -22,7 +22,7 @@
     "form-data": "^4.0.0"
   },
   "build": {
-    "appId": "com.example.whisper-transcriber",
+    "appId": "com.whispertranscriber.app",
     "productName": "Whisper Transcriber",
     "files": [
       "src/**/*",
@@ -31,7 +31,15 @@
     ],
     "mac": {
       "category": "public.app-category.productivity",
-      "target": "dmg"
+      "darkModeSupport": true,
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "target": [
+        "dmg",
+        "zip"
+      ]
     },
     "win": {
       "target": "nsis"
@@ -40,5 +48,11 @@
       "target": "AppImage",
       "category": "Utility"
     }
+  },
+  "os": [
+    "darwin"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
   }
 }

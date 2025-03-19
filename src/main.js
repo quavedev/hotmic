@@ -29,11 +29,6 @@ if (!fs.existsSync(tempDir)) {
   fs.mkdirSync(tempDir, { recursive: true });
 }
 
-// Hide from dock on macOS
-if (process.platform === 'darwin') {
-  app.dock.hide();
-}
-
 /**
  * Application State
  */
@@ -74,11 +69,6 @@ function createMainWindow() {
       return false;
     }
   });
-
-  // Handle window creation on Windows to stay hidden from taskbar
-  if (process.platform === 'win32') {
-    mainWindow.setSkipTaskbar(true);
-  }
 
   mainWindow.once('ready-to-show', () => {
     // Only show on first launch or if API key isn't set
@@ -275,7 +265,6 @@ async function sendToGroqAPI(apiKey, audioFilePath) {
  */
 function createTray() {
   try {
-    // Create a simple tray icon using a base64 encoded image
     const { nativeImage } = require('electron');
 
     // This is a simple 16x16 monochrome icon encoded as base64
@@ -288,7 +277,7 @@ function createTray() {
     tray = new Tray(trayIcon);
 
     // Check if we're showing in the dock
-    const showingInDock = process.platform === 'darwin' ? !app.dock.isVisible() : false;
+    const showingInDock = !app.dock.isVisible();
 
     // Create context menu
     const contextMenu = Menu.buildFromTemplate([
@@ -309,11 +298,10 @@ function createTray() {
       },
       { type: 'separator' },
       {
-        label: process.platform === 'darwin' ? 'Show in Dock' : 'Show in Taskbar',
+        label: 'Show in Dock',
         type: 'checkbox',
         checked: showingInDock,
-        click: () => toggleDockVisibility(),
-        enabled: process.platform === 'darwin'
+        click: () => toggleDockVisibility()
       },
       { type: 'separator' },
       {
@@ -331,25 +319,22 @@ function createTray() {
     console.log('Tray created successfully');
   } catch (error) {
     console.error('Error creating tray:', error);
-    // Continue without tray if it fails
   }
 }
 
 /**
- * Toggle dock/taskbar visibility
+ * Toggle dock visibility
  */
 function toggleDockVisibility() {
-  if (process.platform === 'darwin') {
-    if (app.dock.isVisible()) {
-      app.dock.hide();
-    } else {
-      app.dock.show();
-    }
+  if (app.dock.isVisible()) {
+    app.dock.hide();
+  } else {
+    app.dock.show();
+  }
 
-    // Update the tray menu after toggling
-    if (tray) {
-      createTray();
-    }
+  // Update the tray menu after toggling
+  if (tray) {
+    createTray();
   }
 }
 
@@ -407,7 +392,7 @@ function setupIPCHandlers() {
   });
 
   ipcMain.handle('get-shortcut', () => {
-    return store.get('shortcut') || 'CommandOrControl+Shift+Space';
+    return store.get('shortcut') || 'Command+Shift+Space';
   });
 
   // Audio level updates from renderer
@@ -434,10 +419,8 @@ function initialize() {
   // When app is ready
   app.whenReady().then(() => {
     try {
-      // On macOS, hide from dock by default
-      if (process.platform === 'darwin') {
-        app.dock.hide();
-      }
+      // Hide from dock by default
+      app.dock.hide();
 
       // Create main window first
       createMainWindow();
@@ -446,15 +429,12 @@ function initialize() {
       createTray();
 
       // Register global shortcut
-      const shortcut = store.get('shortcut') || 'CommandOrControl+Shift+Space';
+      const shortcut = store.get('shortcut') || 'Command+Shift+Space';
       globalShortcut.register(shortcut, toggleRecording);
 
       // Handle app activation
       app.on('activate', () => {
-        // On macOS hide from dock again (just in case)
-        if (process.platform === 'darwin') {
-          app.dock.hide();
-        }
+        app.dock.hide();
 
         if (BrowserWindow.getAllWindows().length === 0) {
           createMainWindow();
@@ -467,19 +447,17 @@ function initialize() {
     }
   });
 
-  // Handle dock show/hide events (macOS)
-  if (process.platform === 'darwin') {
-    app.on('browser-window-focus', () => {
-      // Update the tray menu when focus changes
-      if (tray) {
-        createTray();
-      }
-    });
-  }
+  // Handle dock show/hide events
+  app.on('browser-window-focus', () => {
+    // Update the tray menu when focus changes
+    if (tray) {
+      createTray();
+    }
+  });
 
   // Prevent default behavior of closing app when all windows are closed
   app.on('window-all-closed', (e) => {
-    e.preventDefault(); // Prevent app from quitting when all windows are closed
+    e.preventDefault();
   });
 
   // Clean up when app is about to quit
