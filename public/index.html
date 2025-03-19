@@ -853,31 +853,8 @@
       elements.newShortcut.textContent = shortcutString;
     }
 
-    // Load and display history
-    async function loadHistory() {
-      const history = await window.api.getHistory();
-      const historyList = document.getElementById('historyList');
-      historyList.innerHTML = '';
-
-      history.sort((a, b) => b.timestamp - a.timestamp).forEach(item => {
-        const div = document.createElement('div');
-        div.className = 'history-item';
-        div.onclick = () => showTranscriptDetail(item);
-
-        const date = new Date(item.timestamp);
-        const preview = item.processedText || item.rawText;
-
-        div.innerHTML = `
-          <div class="timestamp">${date.toLocaleString()}</div>
-          <div class="preview">${preview.substring(0, 100)}${preview.length > 100 ? '...' : ''}</div>
-        `;
-
-        historyList.appendChild(div);
-      });
-    }
-
     // Show transcript detail in the main content area
-    function showTranscriptDetail(item) {
+    function showTranscriptDetail(item, event) {
       // Update selected state in sidebar
       document.querySelectorAll('.history-item').forEach(el => el.classList.remove('selected'));
       event.currentTarget.classList.add('selected');
@@ -886,13 +863,20 @@
       const detailView = document.getElementById('selectedTranscript');
       const date = new Date(item.timestamp);
 
+      const processedText = item.processedText || 'Processing failed';
+      const canCopyProcessed = item.processedText && item.processedText !== 'Processing failed';
+
       detailView.innerHTML = `
         <div class="content">
           <div class="transcript-section">
             <h3>Processed Transcript</h3>
             <div class="text">${processedText}</div>
             <div class="transcript-actions">
-              <button onclick="copyToClipboard(this, '${encodeURIComponent(item.processedText)}')" class="button-success">Copy Processed</button>
+              <button onclick="copyToClipboard(this, '${encodeURIComponent(canCopyProcessed ? item.processedText : '')}')"
+                      class="button-success"
+                      ${!canCopyProcessed ? 'disabled' : ''}>
+                Copy Processed
+              </button>
             </div>
           </div>
 
@@ -905,6 +889,29 @@
           </div>
         </div>
       `;
+    }
+
+    // Load and display history
+    async function loadHistory() {
+      const history = await window.api.getHistory();
+      const historyList = document.getElementById('historyList');
+      historyList.innerHTML = '';
+
+      history.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'history-item';
+        div.onclick = (event) => showTranscriptDetail(item, event);
+
+        const date = new Date(item.timestamp);
+        const preview = item.processedText || item.rawText;
+
+        div.innerHTML = `
+          <div class="timestamp">${date.toLocaleString()}</div>
+          <div class="preview">${preview.substring(0, 100)}${preview.length > 100 ? '...' : ''}</div>
+        `;
+
+        historyList.appendChild(div);
+      });
     }
 
     // Copy text to clipboard with visual feedback
