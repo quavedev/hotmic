@@ -118,6 +118,54 @@
       font-size: 12px;
       color: #777;
     }
+
+    /* Add styles for history items */
+    .history-item {
+      margin: 10px 0;
+      padding: 10px;
+      background: #f8f9fa;
+      border-radius: 4px;
+      border: 1px solid #e9ecef;
+    }
+
+    .history-item .timestamp {
+      font-size: 12px;
+      color: #6c757d;
+      margin-bottom: 5px;
+    }
+
+    .history-item .transcript {
+      margin: 5px 0;
+      white-space: pre-wrap;
+    }
+
+    .history-item .raw-transcript {
+      color: #666;
+      font-size: 0.9em;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid #e9ecef;
+    }
+
+    .history-item button {
+      margin-right: 5px;
+      padding: 3px 8px;
+      font-size: 12px;
+    }
+
+    .checkbox-group {
+      margin: 10px 0;
+    }
+
+    #promptSection {
+      margin-top: 10px;
+      transition: opacity 0.3s;
+    }
+
+    #promptSection.disabled {
+      opacity: 0.5;
+      pointer-events: none;
+    }
   </style>
 </head>
 
@@ -149,6 +197,22 @@
       <div id="shortcutStatus" class="status"></div>
     </div>
 
+    <!-- Post-Processing Section -->
+    <div class="form-group">
+      <label for="postProcessing">Post-Processing:</label>
+      <div class="checkbox-group">
+        <input type="checkbox" id="enablePostProcessing" checked>
+        <label for="enablePostProcessing">Enable post-processing with Groq LLM</label>
+      </div>
+      <div id="promptSection">
+        <label for="prompt">Processing Prompt:</label>
+        <textarea id="prompt" rows="4" style="width: 100%; margin-top: 5px; resize: vertical;"
+          placeholder="Enter your prompt for post-processing transcripts..."></textarea>
+        <button id="resetPrompt" style="margin-top: 5px;">Reset to Default</button>
+        <div id="promptStatus" class="status"></div>
+      </div>
+    </div>
+
     <!-- Instructions Section -->
     <div class="form-group">
       <h3>How to Use</h3>
@@ -156,8 +220,17 @@
         <li>Press the global shortcut to show the recording overlay</li>
         <li>Speak into your microphone</li>
         <li>Press the shortcut again to stop recording</li>
-        <li>Wait for transcription (results copied to clipboard)</li>
+        <li>Wait for transcription and processing</li>
+        <li>Processed text will be copied to clipboard</li>
       </ol>
+    </div>
+
+    <!-- History Section -->
+    <div class="form-group">
+      <h3>Recent Transcripts</h3>
+      <div id="historyList" style="max-height: 300px; overflow-y: auto;">
+        <!-- History items will be inserted here -->
+      </div>
     </div>
   </div>
 
@@ -186,7 +259,13 @@
       newShortcut: document.getElementById('newShortcut'),
       saveShortcutBtn: document.getElementById('saveShortcut'),
       cancelShortcutBtn: document.getElementById('cancelShortcut'),
-      shortcutStatus: document.getElementById('shortcutStatus')
+      shortcutStatus: document.getElementById('shortcutStatus'),
+
+      // Post-processing elements
+      enablePostProcessing: document.getElementById('enablePostProcessing'),
+      prompt: document.getElementById('prompt'),
+      resetPrompt: document.getElementById('resetPrompt'),
+      promptStatus: document.getElementById('promptStatus')
     };
 
     // Application state
@@ -204,6 +283,8 @@
       try {
         await loadApiKey();
         await loadShortcut();
+        await loadPromptSettings();
+        await loadHistory();
       } catch (error) {
         console.error('Error loading settings:', error);
       }
@@ -222,6 +303,27 @@
     async function loadShortcut() {
       const shortcut = await window.api.getShortcut();
       elements.currentShortcut.textContent = shortcut;
+    }
+
+    // Load prompt settings
+    async function loadPromptSettings() {
+      const settings = await window.api.getPromptSettings();
+      elements.enablePostProcessing.checked = settings.enabled;
+      elements.prompt.value = settings.prompt;
+      updatePromptSectionState();
+    }
+
+    // Update prompt section state based on checkbox
+    function updatePromptSectionState() {
+      const promptSection = document.getElementById('promptSection');
+      promptSection.classList.toggle('disabled', !elements.enablePostProcessing.checked);
+    }
+
+    // Reset prompt to default
+    async function resetPrompt() {
+      const defaultPrompt = 'Please format this transcript as a professional email with a greeting and sign-off. Make it concise and clear while maintaining the key information.';
+      elements.prompt.value = defaultPrompt;
+      await savePromptSettings();
     }
 
     // Save API key to store
@@ -356,6 +458,50 @@
       elements.newShortcut.textContent = shortcutString;
     }
 
+    // Load and display history
+    async function loadHistory() {
+      const history = await window.api.getHistory();
+      const historyList = document.getElementById('historyList');
+      historyList.innerHTML = '';
+
+      history.sort((a, b) => b.timestamp - a.timestamp).forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'history-item';
+
+        const date = new Date(item.timestamp);
+        div.innerHTML = `
+          <div class="timestamp">${date.toLocaleString()}</div>
+          <div class="transcript">${item.processedText || 'Processing failed'}</div>
+          <div class="raw-transcript">Raw transcript: ${item.rawText}</div>
+          <button onclick="copyText('${encodeURIComponent(item.processedText || item.rawText)}')">Copy Processed</button>
+          <button onclick="copyText('${encodeURIComponent(item.rawText)}')">Copy Raw</button>
+        `;
+
+        historyList.appendChild(div);
+      });
+    }
+
+    // Copy text to clipboard
+    function copyText(encodedText) {
+      const text = decodeURIComponent(encodedText);
+      navigator.clipboard.writeText(text).then(() => {
+        showStatus(document.getElementById('historyStatus'), 'Copied to clipboard', 'success');
+      });
+    }
+
+    // Save prompt settings
+    async function savePromptSettings() {
+      try {
+        await window.api.setPromptSettings({
+          enabled: elements.enablePostProcessing.checked,
+          prompt: elements.prompt.value
+        });
+        showStatus(elements.promptStatus, 'Settings saved successfully', 'success');
+      } catch (error) {
+        showStatus(elements.promptStatus, `Error saving settings: ${error.message}`, 'error');
+      }
+    }
+
     /**
      * UI Helpers
      */
@@ -383,6 +529,15 @@
       // Key events for shortcut recording
       document.addEventListener('keydown', handleKeyDown);
       document.addEventListener('keyup', handleKeyUp);
+
+      // Post-processing settings
+      elements.enablePostProcessing.addEventListener('change', () => {
+        updatePromptSectionState();
+        savePromptSettings();
+      });
+
+      elements.prompt.addEventListener('change', savePromptSettings);
+      elements.resetPrompt.addEventListener('click', resetPrompt);
 
       // Error handling
       window.api.onShortcutError && window.api.onShortcutError((message) => {
