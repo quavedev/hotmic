@@ -5,119 +5,291 @@
   <meta charset="UTF-8">
   <title>Recording</title>
   <style>
+    /* Base styles */
     body {
       margin: 0;
       padding: 0;
       background-color: transparent;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, sans-serif;
-      overflow: hidden;
       user-select: none;
       display: flex;
       justify-content: center;
       align-items: center;
       height: 100vh;
+      width: 100vw;
     }
 
+    /* Main container */
     .overlay-container {
-      width: 200px;
-      height: 200px;
-      border-radius: 50%;
-      background-color: rgba(0, 0, 0, 0.5);
-      backdrop-filter: blur(5px);
-      -webkit-backdrop-filter: blur(5px);
+      width: 220px;
+      height: 220px;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
       display: flex;
       flex-direction: column;
       justify-content: center;
       align-items: center;
       color: white;
       text-align: center;
-      padding: 0;
+    }
+
+    /* Blob background */
+    .blob-background {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      background: rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(5px);
+      -webkit-backdrop-filter: blur(5px);
+      z-index: -1;
+      transform-origin: center;
+      transition: transform 0.2s ease-out;
       box-shadow: none;
       border: none;
-      position: relative;
       overflow: hidden;
     }
 
+    /* Reactive blob */
+    .reactive-blob {
+      position: absolute;
+      top: 10%;
+      left: 10%;
+      width: 80%;
+      height: 80%;
+      border-radius: 50%;
+      background: radial-gradient(circle at center,
+          rgba(75, 0, 130, 0.3) 0%,
+          rgba(0, 180, 216, 0.3) 50%,
+          rgba(0, 0, 0, 0) 70%);
+      filter: blur(4px);
+      z-index: -1;
+      animation: pulse 3s infinite alternate;
+      transform-origin: center;
+    }
+
+    /* Outer glow effect */
+    .outer-glow {
+      position: absolute;
+      top: -20%;
+      left: -20%;
+      width: 140%;
+      height: 140%;
+      border-radius: 50%;
+      background: radial-gradient(circle at center,
+          rgba(64, 224, 208, 0.12) 0%,
+          rgba(64, 224, 208, 0) 70%);
+      z-index: -2;
+      animation: breath 4s infinite alternate;
+    }
+
+    /* Particles container */
+    .particles {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 340px;
+      height: 340px;
+      transform: translate(-50%, -50%);
+      overflow: visible;
+      z-index: -1;
+    }
+
+    .particle {
+      position: absolute;
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background-color: rgba(255, 255, 255, 0.3);
+      animation: float 3s infinite linear;
+    }
+
+    /* Recording indicator */
     .recording-indicator {
-      width: 20px;
-      height: 20px;
+      width: 12px;
+      height: 12px;
       border-radius: 50%;
       background-color: #ff3b30;
       margin-bottom: 10px;
+      position: relative;
+      z-index: 2;
+    }
+
+    .recording-indicator::before {
+      content: '';
+      position: absolute;
+      top: -4px;
+      left: -4px;
+      right: -4px;
+      bottom: -4px;
+      background-color: rgba(255, 59, 48, 0.4);
+      border-radius: 50%;
       animation: pulse 1.5s infinite;
+      z-index: 1;
     }
 
-    .audio-level {
+    /* Audio level visualization */
+    .audio-visualizer {
       width: 160px;
-      height: 4px;
-      background-color: rgba(255, 255, 255, 0.15);
-      border-radius: 2px;
+      height: 40px;
       margin: 10px 0;
-      overflow: hidden;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
     }
 
-    .audio-level-fill {
-      height: 100%;
-      width: 0%;
-      background-color: #34c759;
-      border-radius: 3px;
-      transition: width 0.1s ease-out;
+    .audio-bar {
+      width: 3px;
+      height: 5px;
+      background-color: rgba(64, 224, 208, 0.7);
+      border-radius: 1px;
+      transition: height 0.1s ease-out;
     }
 
+    /* Status text */
     .status-message {
       font-size: 14px;
       margin: 5px 0;
       height: 20px;
+      opacity: 0.9;
       text-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
     }
 
+    /* Timer display */
     .time-display {
-      font-size: 24px;
-      font-weight: bold;
-      margin: 10px 0;
+      font-size: 28px;
+      font-weight: 300;
+      margin: 8px 0;
       text-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
+      letter-spacing: 1px;
     }
 
-    .progress-bar {
+    /* Progress bar for transcription */
+    .progress-container {
       width: 160px;
       height: 4px;
-      background-color: rgba(255, 255, 255, 0.15);
+      background-color: rgba(255, 255, 255, 0.1);
       border-radius: 2px;
       margin: 10px 0;
       display: none;
+      overflow: hidden;
+      position: relative;
     }
 
-    .progress-bar-fill {
+    .progress-bar {
       height: 100%;
       width: 0%;
-      background-color: #007aff;
-      border-radius: 3px;
+      background: linear-gradient(90deg, #40E0D0, #7F00FF);
+      border-radius: 2px;
       transition: width 0.3s ease;
     }
 
-    @keyframes pulse {
-      0% {
-        opacity: 1;
-        transform: scale(1);
-      }
-
-      50% {
-        opacity: 0.5;
-        transform: scale(1.1);
-      }
-
-      100% {
-        opacity: 1;
-        transform: scale(1);
-      }
+    .progress-glow {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 30px;
+      height: 100%;
+      background: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.5) 50%, rgba(255, 255, 255, 0) 100%);
+      animation: progressGlow 2s infinite linear;
+      display: none;
     }
 
+    /* Spinner */
+    .spinner {
+      display: none;
+      width: 24px;
+      height: 24px;
+      border: 2px solid rgba(255, 255, 255, 0.1);
+      border-radius: 50%;
+      border-top-color: rgba(64, 224, 208, 0.7);
+      animation: spin 1s linear infinite;
+      margin-bottom: 10px;
+    }
+
+    /* Transcription icon */
     .transcription-icon {
       font-size: 24px;
       margin-bottom: 10px;
       display: none;
     }
 
+    /* Animations */
+    @keyframes pulse {
+      0% {
+        transform: scale(1);
+        opacity: 1;
+      }
+
+      50% {
+        transform: scale(1.05);
+        opacity: 0.8;
+      }
+
+      100% {
+        transform: scale(1);
+        opacity: 1;
+      }
+    }
+
+    @keyframes breath {
+      0% {
+        transform: scale(1);
+        opacity: 0.5;
+      }
+
+      50% {
+        transform: scale(1.1);
+        opacity: 0.7;
+      }
+
+      100% {
+        transform: scale(1);
+        opacity: 0.5;
+      }
+    }
+
+    @keyframes spin {
+      0% {
+        transform: rotate(0deg);
+      }
+
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+
+    @keyframes progressGlow {
+      0% {
+        transform: translateX(-100%);
+      }
+
+      100% {
+        transform: translateX(160px);
+      }
+    }
+
+    @keyframes float {
+      0% {
+        transform: translateY(0) translateX(0);
+        opacity: 0;
+      }
+
+      50% {
+        opacity: 0.5;
+      }
+
+      100% {
+        transform: translateY(-40px) translateX(10px);
+        opacity: 0;
+      }
+    }
+
+    /* States */
     .fade-out {
       animation: fadeOut 0.5s forwards;
     }
@@ -132,24 +304,19 @@
       }
     }
 
-    .spinner {
-      display: none;
-      width: 30px;
-      height: 30px;
-      border: 3px solid rgba(255, 255, 255, 0.3);
-      border-radius: 50%;
-      border-top-color: white;
-      animation: spin 1s linear infinite;
-      margin-bottom: 10px;
+    .processing .blob-background {
+      animation: processingPulse 2s infinite alternate;
     }
 
-    @keyframes spin {
+    @keyframes processingPulse {
       0% {
-        transform: rotate(0deg);
+        transform: scale(1);
+        background: rgba(0, 0, 0, 0.5);
       }
 
       100% {
-        transform: rotate(360deg);
+        transform: scale(1.05);
+        background: rgba(30, 30, 60, 0.5);
       }
     }
   </style>
@@ -157,16 +324,27 @@
 
 <body>
   <div class="overlay-container">
+    <!-- Dynamic background elements -->
+    <div class="blob-background"></div>
+    <div class="reactive-blob"></div>
+    <div class="outer-glow"></div>
+    <div class="particles" id="particles"></div>
+
+    <!-- Visual elements -->
     <div class="recording-indicator"></div>
     <div class="spinner"></div>
-    <div class="transcription-icon">📝</div>
+    <div class="transcription-icon">✓</div>
     <div class="time-display">00:00</div>
-    <div class="audio-level">
-      <div class="audio-level-fill"></div>
-    </div>
+
+    <!-- Audio visualization -->
+    <div class="audio-visualizer" id="audioVisualizer"></div>
+
     <div class="status-message">Recording...</div>
-    <div class="progress-bar">
-      <div class="progress-bar-fill"></div>
+
+    <!-- Progress visualization -->
+    <div class="progress-container">
+      <div class="progress-bar"></div>
+      <div class="progress-glow"></div>
     </div>
   </div>
 
@@ -175,19 +353,24 @@
      * Whisper Transcriber Overlay
      *
      * Handles audio recording and displays visual feedback
-     * for recording and transcription processes.
+     * for recording and transcription processes with reactive sci-fi effects.
      */
 
     // DOM elements
     const elements = {
+      container: document.querySelector('.overlay-container'),
+      blobBackground: document.querySelector('.blob-background'),
+      reactiveBlob: document.querySelector('.reactive-blob'),
       recordingIndicator: document.querySelector('.recording-indicator'),
-      audioLevelFill: document.querySelector('.audio-level-fill'),
       statusMessage: document.querySelector('.status-message'),
       timeDisplay: document.querySelector('.time-display'),
+      progressContainer: document.querySelector('.progress-container'),
       progressBar: document.querySelector('.progress-bar'),
-      progressBarFill: document.querySelector('.progress-bar-fill'),
+      progressGlow: document.querySelector('.progress-glow'),
       spinner: document.querySelector('.spinner'),
-      transcriptionIcon: document.querySelector('.transcription-icon')
+      transcriptionIcon: document.querySelector('.transcription-icon'),
+      particles: document.querySelector('#particles'),
+      audioVisualizer: document.getElementById('audioVisualizer')
     };
 
     // Application state
@@ -199,8 +382,56 @@
       analyser: null,
       dataArray: null,
       mediaRecorder: null,
-      audioData: []
+      audioData: [],
+      audioBars: [],
+      currentAudioLevel: 0
     };
+
+    /**
+     * UI Setup
+     */
+
+    // Create audio visualizer bars
+    function createAudioVisualizer() {
+      // Create 32 bars for the visualizer
+      for (let i = 0; i < 32; i++) {
+        const bar = document.createElement('div');
+        bar.className = 'audio-bar';
+        elements.audioVisualizer.appendChild(bar);
+        state.audioBars.push(bar);
+      }
+    }
+
+    // Create floating particles
+    function createParticles() {
+      // Create 15 particles
+      for (let i = 0; i < 15; i++) {
+        const particle = document.createElement('div');
+        particle.className = 'particle';
+
+        // Random positions
+        const size = Math.random() * 3 + 2;
+        particle.style.width = `${size}px`;
+        particle.style.height = `${size}px`;
+        particle.style.opacity = Math.random() * 0.5;
+
+        // Random starting positions relative to center
+        const angle = Math.random() * Math.PI * 2;
+        const distance = Math.random() * 120 + 40;
+        const x = Math.cos(angle) * distance;
+        const y = Math.sin(angle) * distance;
+
+        // Position from center (particles container is centered with transform)
+        particle.style.left = `calc(50% + ${x}px)`;
+        particle.style.top = `calc(50% + ${y}px)`;
+
+        // Random animations
+        particle.style.animationDelay = `${Math.random() * 3}s`;
+        particle.style.animationDuration = `${Math.random() * 3 + 2}s`;
+
+        elements.particles.appendChild(particle);
+      }
+    }
 
     /**
      * Recording functionality
@@ -226,15 +457,53 @@
       return sum / array.length;
     }
 
+    // Update visualizer with audio levels
+    function updateAudioVisualizer(levelData) {
+      // Update each bar
+      for (let i = 0; i < state.audioBars.length; i++) {
+        // Add some randomness for a more natural look
+        const barIndex = Math.floor(i * (levelData.length / state.audioBars.length));
+        const level = levelData[barIndex] / 255;
+
+        // Make middle bars taller for a natural curve
+        const middleEffect = 1 + Math.sin((i / state.audioBars.length) * Math.PI) * 0.5;
+
+        // Add some randomness
+        const randomness = 0.7 + Math.random() * 0.6;
+
+        const height = level * 35 * middleEffect * randomness;
+        state.audioBars[i].style.height = `${Math.max(3, height)}px`;
+
+        // Color based on height
+        const hue = 180 + (level * 60); // cyan to purple
+        state.audioBars[i].style.backgroundColor = `hsla(${hue}, 80%, 60%, 0.7)`;
+      }
+    }
+
+    // Update blob based on audio level
+    function updateBlob(level) {
+      const scaleFactor = 1 + level * 0.3;
+      elements.reactiveBlob.style.transform = `scale(${scaleFactor})`;
+
+      // Make blob glow brighter with louder audio
+      const opacity = 0.3 + level * 0.4;
+      elements.reactiveBlob.style.background = `radial-gradient(circle at center,
+                          rgba(75, 0, 130, ${opacity}) 0%,
+                          rgba(0, 180, 216, ${opacity * 0.7}) 50%,
+                          rgba(0, 0, 0, 0) 70%)`;
+    }
+
     // Monitor and display audio levels
     function monitorAudioLevel() {
       if (!state.analyser) return;
 
       state.analyser.getByteFrequencyData(state.dataArray);
       const level = calculateAudioLevel(state.dataArray);
+      state.currentAudioLevel = level;
 
       // Update UI
-      elements.audioLevelFill.style.width = `${level * 100}%`;
+      updateAudioVisualizer(state.dataArray);
+      updateBlob(level);
 
       // Send to main process
       window.api.sendAudioLevel(level);
@@ -280,7 +549,7 @@
       state.audioContext = new AudioContext();
       const source = state.audioContext.createMediaStreamSource(stream);
       state.analyser = state.audioContext.createAnalyser();
-      state.analyser.fftSize = 256;
+      state.analyser.fftSize = 128;
       source.connect(state.analyser);
       state.dataArray = new Uint8Array(state.analyser.frequencyBinCount);
 
@@ -342,20 +611,28 @@
 
     // Set UI for recording state
     function setRecordingUI() {
+      elements.container.classList.remove('processing');
       elements.recordingIndicator.style.display = 'block';
       elements.transcriptionIcon.style.display = 'none';
       elements.spinner.style.display = 'none';
-      elements.progressBar.style.display = 'none';
-      elements.audioLevelFill.style.width = '0%';
+      elements.progressContainer.style.display = 'none';
       elements.statusMessage.textContent = 'Recording...';
     }
 
     // Set UI for processing state
     function setProcessingUI() {
+      elements.container.classList.add('processing');
       elements.recordingIndicator.style.display = 'none';
       elements.spinner.style.display = 'block';
-      elements.progressBar.style.display = 'block';
+      elements.progressContainer.style.display = 'block';
+      elements.progressGlow.style.display = 'block';
       elements.statusMessage.textContent = 'Processing...';
+
+      // Reset audio visualizer to small bars
+      state.audioBars.forEach(bar => {
+        bar.style.height = '3px';
+        bar.style.backgroundColor = 'rgba(64, 224, 208, 0.4)';
+      });
     }
 
     // Handle transcription progress updates
@@ -372,7 +649,7 @@
 
       // Update UI
       elements.statusMessage.textContent = progressInfo.text;
-      elements.progressBarFill.style.width = `${progressInfo.progress}%`;
+      elements.progressBar.style.width = `${progressInfo.progress}%`;
 
       // For completion, show checkmark instead of spinner
       if (data.step === 'complete') {
@@ -382,13 +659,29 @@
 
       // For error, change colors
       if (data.step === 'error') {
-        elements.progressBarFill.style.backgroundColor = '#ff3b30';
+        elements.progressBar.style.backgroundImage = 'linear-gradient(90deg, #ff3b30, #ff9500)';
       }
     }
 
     /**
      * Event Handlers
      */
+
+    // External audio level update (from other windows)
+    function handleExternalAudioLevel(level) {
+      if (!state.isRecording) {
+        // Update the visualizer with fake data based on the level
+        const fakeData = new Uint8Array(64);
+        for (let i = 0; i < fakeData.length; i++) {
+          // Create a curve with higher values in the middle
+          const centerEffect = Math.sin((i / fakeData.length) * Math.PI);
+          fakeData[i] = Math.min(255, Math.floor(level * 255 * centerEffect * 1.5));
+        }
+
+        updateAudioVisualizer(fakeData);
+        updateBlob(level);
+      }
+    }
 
     // Register event listeners
     function registerEventListeners() {
@@ -403,16 +696,23 @@
       });
 
       // Listen for audio level events (from other windows)
-      window.api.onAudioLevel((level) => {
-        elements.audioLevelFill.style.width = `${level * 100}%`;
-      });
+      window.api.onAudioLevel(handleExternalAudioLevel);
 
       // Listen for transcription progress
       window.api.onTranscriptionProgress(handleTranscriptionProgress);
     }
 
+    // Initialize the UI
+    function initializeUI() {
+      createAudioVisualizer();
+      createParticles();
+    }
+
     // Initialize when DOM is loaded
-    document.addEventListener('DOMContentLoaded', registerEventListeners);
+    document.addEventListener('DOMContentLoaded', () => {
+      initializeUI();
+      registerEventListeners();
+    });
   </script>
 </body>
 

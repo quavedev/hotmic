@@ -86,10 +86,10 @@ function createOverlayWindow() {
   const { width, height } = primaryDisplay.workAreaSize;
 
   overlayWindow = new BrowserWindow({
-    width: 220,
-    height: 220,
-    x: Math.floor(width / 2 - 110),
-    y: Math.floor(height / 2 - 110),
+    width: 340,
+    height: 340,
+    x: Math.floor(width / 2 - 150),
+    y: Math.floor(height / 2 - 150),
     frame: false,
     transparent: true,
     backgroundColor: '#00000000',
