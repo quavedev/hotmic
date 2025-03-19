@@ -5,160 +5,249 @@
   <meta charset="UTF-8">
   <title>Whisper Transcriber Settings</title>
   <style>
-    /* Base styles */
+    :root {
+      color-scheme: light dark;
+
+      /* System Colors */
+      --background: var(--apple-system-background, #ffffff);
+      --text: var(--apple-system-text, #000000);
+      --secondary-text: var(--apple-system-secondary-label, #666666);
+      --control-background: rgba(0, 0, 0, 0.1);
+      --control-border: rgba(0, 0, 0, 0.1);
+      --accent: #007AFF;
+      --separator: rgba(0, 0, 0, 0.1);
+
+      /* Custom Colors - Light Mode */
+      --form-group-background: rgba(0, 0, 0, 0.03);
+      --input-background: rgba(0, 0, 0, 0.1);
+      --button-background: rgba(255, 255, 255, 0.8);
+      --button-hover: rgba(0, 0, 0, 0.05);
+      --scrollbar-thumb: rgba(0, 0, 0, 0.2);
+      --scrollbar-thumb-hover: rgba(0, 0, 0, 0.3);
+
+      /* Spacing */
+      --spacing-xs: 4px;
+      --spacing-sm: 8px;
+      --spacing-md: 16px;
+      --spacing-lg: 24px;
+
+      /* Radius */
+      --radius-sm: 4px;
+      --radius-md: 6px;
+      --radius-lg: 8px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        /* System Colors - Dark Mode */
+        --background: #1e1e1e;
+        --text: #ffffff;
+        --secondary-text: #999999;
+        --control-background: rgba(255, 255, 255, 0.1);
+        --control-border: rgba(255, 255, 255, 0.1);
+        --separator: rgba(255, 255, 255, 0.1);
+
+        /* Custom Colors - Dark Mode */
+        --form-group-background: rgba(255, 255, 255, 0.05);
+        --input-background: rgba(0, 0, 0, 0.3);
+        --button-background: rgba(255, 255, 255, 0.1);
+        --button-hover: rgba(255, 255, 255, 0.15);
+        --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+        --scrollbar-thumb-hover: rgba(255, 255, 255, 0.3);
+      }
+    }
+
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       margin: 0;
-      padding: 20px;
-      background-color: #f5f5f5;
-      color: #333;
+      padding: 0;
+      background: var(--background);
+      color: var(--text);
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      min-width: 700px;
+      min-height: 500px;
     }
 
-    /* Container */
     .container {
-      max-width: 500px;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    /* Tab Navigation */
+    .tab-nav {
+      display: flex;
+      padding: var(--spacing-lg) var(--spacing-md) 0;
+      gap: var(--spacing-xs);
+      background: var(--tab-background);
+      border-bottom: 1px solid var(--separator);
+      justify-content: center;
+    }
+
+    .tab-button {
+      padding: var(--spacing-sm) var(--spacing-md);
+      background: var(--tab-background);
+      border: 1px solid var(--control-border);
+      border-bottom: none;
+      border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+      color: var(--text);
+      font-size: 13px;
+      cursor: pointer;
+      position: relative;
+      bottom: -1px;
+    }
+
+    .tab-button.active {
+      background: var(--tab-active-background);
+      border-bottom: 1px solid var(--tab-active-background);
+    }
+
+    /* Tab Content */
+    .tab-content {
+      flex: 1;
+      padding: var(--spacing-lg);
+      overflow-y: auto;
+    }
+
+    .tab-panel {
+      display: none;
+      max-width: 650px;
       margin: 0 auto;
-      background: white;
-      padding: 20px;
-      border-radius: 8px;
-      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
     }
 
-    /* Headers */
-    h1 {
-      text-align: center;
-      color: #333;
-      margin-top: 0;
-      padding-bottom: 10px;
-      border-bottom: 1px solid #eee;
+    .tab-panel.active {
+      display: block;
     }
 
-    /* Form elements */
+    h1,
+    h2,
+    h3 {
+      font-weight: 500;
+      margin: 0 0 var(--spacing-md) 0;
+      color: var(--text);
+    }
+
     .form-group {
-      margin-bottom: 20px;
+      margin-bottom: var(--spacing-lg);
+      padding: var(--spacing-md);
+      background: var(--form-group-background);
+      border: 1px solid var(--control-border);
+      border-radius: var(--radius-md);
     }
 
     label {
       display: block;
-      margin-bottom: 5px;
+      margin-bottom: var(--spacing-xs);
+      color: var(--text);
       font-weight: 500;
     }
 
     input[type="text"],
-    input[type="password"] {
+    input[type="password"],
+    textarea {
       width: 100%;
-      padding: 8px;
-      font-size: 14px;
-      border: 1px solid #ddd;
-      border-radius: 4px;
+      padding: var(--spacing-sm);
+      margin-bottom: var(--spacing-sm);
+      border: 1px solid var(--control-border);
+      border-radius: var(--radius-sm);
+      background: var(--input-background);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 13px;
       box-sizing: border-box;
     }
 
+    input[type="text"]:focus,
+    input[type="password"]:focus,
+    textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 30%, transparent);
+    }
+
     button {
-      background-color: #007aff;
-      color: white;
-      border: none;
-      padding: 10px 15px;
-      font-size: 14px;
-      border-radius: 4px;
+      padding: var(--spacing-sm) var(--spacing-md);
+      background: var(--button-background);
+      border: 1px solid var(--control-border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-size: 13px;
       cursor: pointer;
-      transition: background-color 0.3s;
+      transition: all 0.2s ease;
+      font-weight: 500;
     }
 
     button:hover {
-      background-color: #0055cc;
+      background: var(--button-hover);
     }
 
-    button:disabled {
-      background-color: #cccccc;
-      cursor: not-allowed;
+    button.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: white;
+      font-weight: 600;
     }
 
-    /* Status messages */
+    button.primary:hover {
+      filter: brightness(1.1);
+    }
+
     .status {
-      margin-top: 10px;
-      padding: 10px;
-      border-radius: 4px;
-      font-size: 14px;
-    }
-
-    .success {
-      background-color: #d4edda;
-      color: #155724;
-      border: 1px solid #c3e6cb;
-    }
-
-    .error {
-      background-color: #f8d7da;
-      color: #721c24;
-      border: 1px solid #f5c6cb;
-    }
-
-    .info {
-      background-color: #e7f3fe;
-      color: #0c5460;
-      border: 1px solid #bee5eb;
-    }
-
-    /* Shortcut display */
-    .current-shortcut {
-      display: inline-block;
-      padding: 3px 8px;
-      background-color: #eee;
-      border-radius: 4px;
-      font-family: monospace;
-      font-size: 14px;
-      margin-left: 5px;
-    }
-
-    /* Footer */
-    footer {
-      margin-top: 20px;
-      text-align: center;
+      margin-top: var(--spacing-xs);
       font-size: 12px;
-      color: #777;
     }
 
-    /* Add styles for history items */
-    .history-item {
-      margin: 10px 0;
-      padding: 10px;
-      background: #f8f9fa;
-      border-radius: 4px;
-      border: 1px solid #e9ecef;
+    .status.success {
+      color: var(--system-green);
     }
 
-    .history-item .timestamp {
-      font-size: 12px;
-      color: #6c757d;
-      margin-bottom: 5px;
-    }
-
-    .history-item .transcript {
-      margin: 5px 0;
-      white-space: pre-wrap;
-    }
-
-    .history-item .raw-transcript {
-      color: #666;
-      font-size: 0.9em;
-      margin-top: 10px;
-      padding-top: 10px;
-      border-top: 1px solid #e9ecef;
-    }
-
-    .history-item button {
-      margin-right: 5px;
-      padding: 3px 8px;
-      font-size: 12px;
+    .status.error {
+      color: var(--system-red);
     }
 
     .checkbox-group {
-      margin: 10px 0;
+      margin: var(--spacing-sm) 0;
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-xs);
+    }
+
+    input[type="checkbox"] {
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border: 1px solid var(--control-border);
+      border-radius: 4px;
+      background: var(--input-background);
+      cursor: pointer;
+      position: relative;
+      vertical-align: middle;
+    }
+
+    input[type="checkbox"]:checked {
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+
+    input[type="checkbox"]:checked::after {
+      content: '';
+      position: absolute;
+      left: 5px;
+      top: 2px;
+      width: 4px;
+      height: 8px;
+      border: solid white;
+      border-width: 0 2px 2px 0;
+      transform: rotate(45deg);
+    }
+
+    input[type="checkbox"]:hover {
+      border-color: var(--accent);
     }
 
     #promptSection {
-      margin-top: 10px;
+      margin-top: var(--spacing-md);
       transition: opacity 0.3s;
     }
 
@@ -166,77 +255,183 @@
       opacity: 0.5;
       pointer-events: none;
     }
+
+    /* History Section */
+    .history-item {
+      margin: var(--spacing-sm) 0;
+      padding: var(--spacing-md);
+      background: var(--control-background);
+      border: 1px solid var(--control-border);
+      border-radius: var(--radius-md);
+    }
+
+    .history-item .timestamp {
+      font-size: 12px;
+      color: var(--secondary-text);
+      margin-bottom: var(--spacing-xs);
+    }
+
+    .history-item .transcript {
+      margin: var(--spacing-xs) 0;
+      white-space: pre-wrap;
+      color: var(--text);
+    }
+
+    .history-item .raw-transcript {
+      color: var(--secondary-text);
+      font-size: 0.9em;
+      margin-top: var(--spacing-sm);
+      padding-top: var(--spacing-sm);
+      border-top: 1px solid var(--separator);
+    }
+
+    .history-item button {
+      margin-right: var(--spacing-xs);
+      padding: 2px var(--spacing-sm);
+      font-size: 12px;
+    }
+
+    footer {
+      margin-top: var(--spacing-lg);
+      padding-top: var(--spacing-md);
+      border-top: 1px solid var(--separator);
+      text-align: center;
+      color: var(--secondary-text);
+      font-size: 12px;
+    }
+
+    /* Scrollbar styling */
+    ::-webkit-scrollbar {
+      width: 12px;
+      height: 12px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+      border-radius: var(--radius-lg);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--scrollbar-thumb);
+      border: 2px solid transparent;
+      background-clip: padding-box;
+      border-radius: var(--radius-lg);
+      min-height: 40px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--scrollbar-thumb-hover);
+    }
+
+    /* Shortcut display */
+    .shortcut-display {
+      display: inline-block;
+      padding: var(--spacing-xs) var(--spacing-sm);
+      background: var(--input-background);
+      border: 1px solid var(--control-border);
+      border-radius: var(--radius-sm);
+      font-family: monospace;
+      margin: var(--spacing-xs) 0;
+    }
+
+    .shortcut-controls {
+      display: flex;
+      gap: var(--spacing-sm);
+      align-items: center;
+      margin-top: var(--spacing-sm);
+    }
+
+    #shortcutListener {
+      margin-top: var(--spacing-sm);
+    }
   </style>
 </head>
 
 <body>
   <div class="container">
-    <h1>Whisper Transcriber Settings</h1>
+    <!-- Tab Navigation -->
+    <nav class="tab-nav">
+      <button class="tab-button active" data-tab="general">General</button>
+      <button class="tab-button" data-tab="transcription">Transcription</button>
+      <button class="tab-button" data-tab="history">History</button>
+    </nav>
 
-    <!-- API Key Section -->
-    <div class="form-group">
-      <label for="apiKey">Groq API Key:</label>
-      <input type="password" id="apiKey" placeholder="Enter your Groq API key">
-      <button id="saveApiKey">Save API Key</button>
-      <div id="apiKeyStatus" class="status"></div>
+    <!-- Tab Content -->
+    <div class="tab-content">
+      <!-- General Tab -->
+      <div class="tab-panel active" id="general-panel">
+        <div class="form-group">
+          <h3>Global Shortcut</h3>
+          <div>
+            Current: <span id="currentShortcut" class="shortcut-display"></span>
+          </div>
+          <div id="shortcutListener" style="display: none;">
+            <p>Press the key combination you want to use:</p>
+            <span id="newShortcut" class="shortcut-display">Listening...</span>
+          </div>
+          <div class="shortcut-controls">
+            <button id="editShortcut">Change Shortcut</button>
+            <button id="saveShortcut" style="display: none;">Save</button>
+            <button id="cancelShortcut" style="display: none;">Cancel</button>
+          </div>
+          <div id="shortcutStatus" class="status"></div>
+        </div>
+
+        <div class="form-group">
+          <h3>How to Use</h3>
+          <ol style="margin: 0; padding-left: var(--spacing-lg);">
+            <li>Press the global shortcut to show the recording overlay</li>
+            <li>Speak into your microphone</li>
+            <li>Press the shortcut again to stop recording</li>
+            <li>Wait for transcription and processing</li>
+            <li>Processed text will be copied to clipboard</li>
+          </ol>
+        </div>
+      </div>
+
+      <!-- Transcription Tab -->
+      <div class="tab-panel" id="transcription-panel">
+        <div class="form-group">
+          <h3>API Configuration</h3>
+          <label for="apiKey">Groq API Key:</label>
+          <div style="display: flex; gap: var(--spacing-sm);">
+            <input type="password" id="apiKey" placeholder="Enter your Groq API key">
+            <button id="saveApiKey" class="primary">Save</button>
+          </div>
+          <div id="apiKeyStatus" class="status"></div>
+        </div>
+
+        <div class="form-group">
+          <h3>Post-Processing</h3>
+          <div class="checkbox-group">
+            <input type="checkbox" id="enablePostProcessing" checked>
+            <label for="enablePostProcessing">Enable post-processing with Groq LLM</label>
+          </div>
+          <div id="promptSection">
+            <label for="prompt">Processing Prompt:</label>
+            <textarea id="prompt" rows="4" style="width: 100%; margin-top: var(--spacing-xs); resize: vertical;"
+              placeholder="Enter your prompt for post-processing transcripts..."></textarea>
+            <button id="resetPrompt" style="margin-top: var(--spacing-xs);">Reset to Default</button>
+            <div id="promptStatus" class="status"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- History Tab -->
+      <div class="tab-panel" id="history-panel">
+        <div class="form-group">
+          <h3>Recent Transcripts</h3>
+          <div id="historyList" style="max-height: 400px; overflow-y: auto;">
+            <!-- History items will be inserted here -->
+          </div>
+        </div>
+      </div>
     </div>
 
-    <!-- Global Shortcut Section -->
-    <div class="form-group">
-      <label for="shortcut">Global Shortcut:</label>
-      <div>
-        Current: <span id="currentShortcut" class="current-shortcut">Loading...</span>
-        <button id="changeShortcut">Change</button>
-      </div>
-      <div id="shortcutListener" style="display: none;">
-        <p>Press the key combination you want to use:</p>
-        <div id="newShortcut" class="current-shortcut">Listening...</div>
-        <button id="saveShortcut" disabled>Save</button>
-        <button id="cancelShortcut">Cancel</button>
-      </div>
-      <div id="shortcutStatus" class="status"></div>
-    </div>
-
-    <!-- Post-Processing Section -->
-    <div class="form-group">
-      <label for="postProcessing">Post-Processing:</label>
-      <div class="checkbox-group">
-        <input type="checkbox" id="enablePostProcessing" checked>
-        <label for="enablePostProcessing">Enable post-processing with Groq LLM</label>
-      </div>
-      <div id="promptSection">
-        <label for="prompt">Processing Prompt:</label>
-        <textarea id="prompt" rows="4" style="width: 100%; margin-top: 5px; resize: vertical;"
-          placeholder="Enter your prompt for post-processing transcripts..."></textarea>
-        <button id="resetPrompt" style="margin-top: 5px;">Reset to Default</button>
-        <div id="promptStatus" class="status"></div>
-      </div>
-    </div>
-
-    <!-- Instructions Section -->
-    <div class="form-group">
-      <h3>How to Use</h3>
-      <ol>
-        <li>Press the global shortcut to show the recording overlay</li>
-        <li>Speak into your microphone</li>
-        <li>Press the shortcut again to stop recording</li>
-        <li>Wait for transcription and processing</li>
-        <li>Processed text will be copied to clipboard</li>
-      </ol>
-    </div>
-
-    <!-- History Section -->
-    <div class="form-group">
-      <h3>Recent Transcripts</h3>
-      <div id="historyList" style="max-height: 300px; overflow-y: auto;">
-        <!-- History items will be inserted here -->
-      </div>
-    </div>
+    <footer>
+      <p>Whisper Transcriber v1.0.0</p>
+    </footer>
   </div>
-
-  <footer>
-    Whisper Transcriber uses Groq API and Whisper-large-v3 model
-  </footer>
 
   <script>
     /**
@@ -254,11 +449,11 @@
 
       // Shortcut elements
       currentShortcut: document.getElementById('currentShortcut'),
-      changeShortcutBtn: document.getElementById('changeShortcut'),
+      editShortcut: document.getElementById('editShortcut'),
       shortcutListener: document.getElementById('shortcutListener'),
       newShortcut: document.getElementById('newShortcut'),
-      saveShortcutBtn: document.getElementById('saveShortcut'),
-      cancelShortcutBtn: document.getElementById('cancelShortcut'),
+      saveShortcut: document.getElementById('saveShortcut'),
+      cancelShortcut: document.getElementById('cancelShortcut'),
       shortcutStatus: document.getElementById('shortcutStatus'),
 
       // Post-processing elements
@@ -350,17 +545,21 @@
     // Start listening for shortcut keys
     function startShortcutListener() {
       elements.shortcutListener.style.display = 'block';
-      elements.changeShortcutBtn.disabled = true;
+      elements.editShortcut.style.display = 'none';
+      elements.saveShortcut.style.display = 'inline-block';
+      elements.cancelShortcut.style.display = 'inline-block';
       state.listeningForShortcut = true;
       state.keys.clear();
       elements.newShortcut.textContent = 'Listening...';
-      elements.saveShortcutBtn.disabled = true;
+      elements.saveShortcut.disabled = true;
     }
 
     // Cancel shortcut change
     function cancelShortcutChange() {
       elements.shortcutListener.style.display = 'none';
-      elements.changeShortcutBtn.disabled = false;
+      elements.editShortcut.style.display = 'inline-block';
+      elements.saveShortcut.style.display = 'none';
+      elements.cancelShortcut.style.display = 'none';
       state.listeningForShortcut = false;
     }
 
@@ -420,7 +619,7 @@
 
       // Enable save button if we have valid keys
       if (state.keys.size > 0) {
-        elements.saveShortcutBtn.disabled = false;
+        elements.saveShortcut.disabled = false;
       }
     }
 
@@ -522,9 +721,9 @@
       elements.saveApiKeyBtn.addEventListener('click', saveApiKey);
 
       // Shortcut events
-      elements.changeShortcutBtn.addEventListener('click', startShortcutListener);
-      elements.cancelShortcutBtn.addEventListener('click', cancelShortcutChange);
-      elements.saveShortcutBtn.addEventListener('click', saveShortcut);
+      elements.editShortcut.addEventListener('click', startShortcutListener);
+      elements.cancelShortcut.addEventListener('click', cancelShortcutChange);
+      elements.saveShortcut.addEventListener('click', saveShortcut);
 
       // Key events for shortcut recording
       document.addEventListener('keydown', handleKeyDown);
@@ -545,10 +744,28 @@
       });
     }
 
+    // Add tab switching logic
+    function setupTabs() {
+      const tabButtons = document.querySelectorAll('.tab-button');
+
+      tabButtons.forEach(button => {
+        button.addEventListener('click', () => {
+          // Remove active class from all buttons and panels
+          tabButtons.forEach(btn => btn.classList.remove('active'));
+          document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.remove('active'));
+
+          // Add active class to clicked button and corresponding panel
+          button.classList.add('active');
+          document.getElementById(`${button.dataset.tab}-panel`).classList.add('active');
+        });
+      });
+    }
+
     // Initialize when DOM is loaded
     document.addEventListener('DOMContentLoaded', () => {
       loadSettings();
       bindEventListeners();
+      setupTabs();
     });
   </script>
 </body>
