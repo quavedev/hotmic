@@ -1,4 +1,4 @@
-# Whisper Transcriber
+# HotMic
 
 A lightweight desktop application that transcribes audio using the Groq API and Whisper-large-v3 model.
 

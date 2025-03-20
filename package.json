@@ -1,5 +1,5 @@
 {
-  "name": "whisper-transcriber",
+  "name": "hot-mic",
   "version": "1.0.0",
   "description": "Desktop app for audio transcription using Groq API and Whisper model",
   "type": "module",
@@ -24,8 +24,8 @@
     "undici": "*"
   },
   "build": {
-    "appId": "com.whispertranscriber.app",
-    "productName": "Whisper Transcriber",
+    "appId": "com.hotmic.app",
+    "productName": "HotMic",
     "icon": "build/icon.icns",
     "files": [
       "src/**/*",

@@ -1,5 +1,5 @@
 /**
- * Whisper Transcriber Main Process
+ * HotMic Main Process
  *
  * This file handles the main Electron process:
  * - Window management
@@ -31,7 +31,7 @@ const __dirname = path.dirname(__filename);
 const store = new Store();
 
 // Define temp directory for audio files
-const tempDir = path.join(os.tmpdir(), 'whisper-transcriber');
+const tempDir = path.join(os.tmpdir(), 'hot-mic');
 if (!fs.existsSync(tempDir)) {
   fs.mkdirSync(tempDir, { recursive: true });
 }
@@ -329,7 +329,7 @@ function createTray() {
       }
     ]);
 
-    tray.setToolTip('Whisper Transcriber');
+    tray.setToolTip('HotMic');
     tray.setContextMenu(contextMenu);
   } catch (error) {
     console.error('Error creating tray:', error);
@@ -580,7 +580,7 @@ function createMainWindow() {
     },
     show: false,
     skipTaskbar: false,
-    title: 'Whisper Transcriber',
+    title: 'HotMic',
     titleBarStyle: 'hiddenInset',
     backgroundColor: '#00000000'
   });
