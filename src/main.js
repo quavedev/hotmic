@@ -230,28 +230,49 @@ async function sendToGroqAPI(apiKey, audioFilePath) {
         if (res.statusCode >= 200 && res.statusCode < 300) {
           resolve({ ok: true, data });
         } else {
+          console.error('API Error Response:', {
+            statusCode: res.statusCode,
+            data: data
+          });
           resolve({ ok: false, statusCode: res.statusCode, data });
         }
       });
     });
 
-    req.on('error', reject);
+    req.on('error', (error) => {
+      console.error('Request Error:', error);
+      reject(error);
+    });
+
     formData.pipe(req);
   });
 
   if (!response.ok) {
+    console.error('API Error:', response.data);
     throw new Error(`API error: ${response.data}`);
   }
 
-  const result = JSON.parse(response.data);
-  const transcript = result.text?.trim();
+  try {
+    const result = JSON.parse(response.data);
+    console.log('API Response:', result);
 
-  // If no transcript or empty transcript, throw error
-  if (!transcript) {
-    throw new Error('No speech detected');
+    if (!result || typeof result !== 'object') {
+      throw new Error('Invalid API response format');
+    }
+
+    const transcript = result.text?.trim();
+    console.log('Extracted transcript:', transcript);
+
+    // If no transcript or empty transcript, throw error
+    if (!transcript) {
+      throw new Error('No speech detected in audio');
+    }
+
+    return transcript;
+  } catch (error) {
+    console.error('Error processing API response:', error);
+    throw new Error(`Failed to process API response: ${error.message}`);
   }
-
-  return transcript;
 }
 
 /**
@@ -259,6 +280,12 @@ async function sendToGroqAPI(apiKey, audioFilePath) {
  */
 function createTray() {
   try {
+    // Clean up existing tray if it exists
+    if (tray) {
+      tray.destroy();
+      tray = null;
+    }
+
     // Create native image from file
     const trayIcon = nativeImage.createFromPath(path.join(__dirname, '../public/icons/32x32.png'));
 
@@ -321,7 +348,40 @@ function toggleDockVisibility() {
 
   // Update the tray menu after toggling
   if (tray) {
-    createTray();
+    const showingInDock = !app.dock.isVisible();
+    const contextMenu = Menu.buildFromTemplate([
+      {
+        label: 'Start/Stop Recording',
+        click: toggleRecording
+      },
+      { type: 'separator' },
+      {
+        label: 'Settings',
+        click: () => {
+          if (mainWindow) {
+            mainWindow.show();
+          } else {
+            createMainWindow();
+          }
+        }
+      },
+      { type: 'separator' },
+      {
+        label: 'Show in Dock',
+        type: 'checkbox',
+        checked: showingInDock,
+        click: () => toggleDockVisibility()
+      },
+      { type: 'separator' },
+      {
+        label: 'Quit',
+        click: () => {
+          app.isQuitting = true;
+          app.quit();
+        }
+      }
+    ]);
+    tray.setContextMenu(contextMenu);
   }
 }
 
@@ -477,13 +537,6 @@ async function initialize() {
     console.error('Error initializing app:', error);
   }
 
-  // Handle dock show/hide events
-  app.on('browser-window-focus', () => {
-    // Update the tray menu when focus changes
-    if (tray) {
-      createTray();
-    }
-  });
 
   // Prevent default behavior of closing app when all windows are closed
   app.on('window-all-closed', (e) => {
