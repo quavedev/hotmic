@@ -254,13 +254,10 @@ function createTray() {
   try {
     const { nativeImage } = require('electron');
 
-    // This is a simple 16x16 monochrome icon encoded as base64
-    const iconBase64 = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAALGPC/xhBQAAAAlwSFlzAAAOxAAADsQBlSsOGwAAAGdJREFUOE/tk8EJwCAQBL+gvdjGfSkgtZhKbEQQY8CAJuRezgeXA24YRVdBEFyEmdFPUl+IJ1SZQNoQWSBkAQMJizxXkHPmn4LNmzLw0mgbIgz8JQN23tLHiHAF+A/IAnILDgXXeRYXchHSBDH5SjwAAAAASUVORK5CYII=';
+    // Create native image from file
+    const trayIcon = nativeImage.createFromPath(path.join(__dirname, '../public/icons/32x32.png'));
 
-    // Create native image from base64
-    const trayIcon = nativeImage.createFromDataURL(`data:image/png;base64,${iconBase64}`);
-
-    // Create tray
+    // Create tray with template image
     tray = new Tray(trayIcon);
 
     // Check if we're showing in the dock

@@ -14,16 +14,17 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "electron": "^29.0.0",
-    "electron-builder": "^24.9.1"
+    "electron": "*",
+    "electron-builder": "*"
   },
   "dependencies": {
-    "electron-store": "^10.0.1",
-    "form-data": "^4.0.0"
+    "electron-store": "*",
+    "form-data": "*"
   },
   "build": {
     "appId": "com.whispertranscriber.app",
     "productName": "Whisper Transcriber",
+    "icon": "build/icon.icns",
     "files": [
       "src/**/*",
       "public/**/*",
