@@ -9,13 +9,20 @@
  * - Tray icon
  */
 
-const { app, BrowserWindow, ipcMain, globalShortcut, Menu, Tray, clipboard } = require('electron');
-const path = require('path');
-const https = require('https');
-const FormData = require('form-data');
-const fs = require('fs');
-const os = require('os');
-const Store = require('electron-store').default;
+import { app, BrowserWindow, ipcMain, globalShortcut, Menu, Tray, clipboard, nativeImage, screen } from 'electron';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import https from 'node:https';
+import FormData from 'form-data';
+import fs from 'node:fs';
+import os from 'node:os';
+import Store from 'electron-store';
+// Import fetch API for Node.js (available in modern Node.js)
+import { fetch } from 'undici';
+
+// Fix __dirname and __filename which aren't available in ESM
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * Application Configuration
@@ -252,8 +259,6 @@ async function sendToGroqAPI(apiKey, audioFilePath) {
  */
 function createTray() {
   try {
-    const { nativeImage } = require('electron');
-
     // Create native image from file
     const trayIcon = nativeImage.createFromPath(path.join(__dirname, '../public/icons/32x32.png'));
 
@@ -432,7 +437,7 @@ function setupIPCHandlers() {
 /**
  * App Lifecycle Management
  */
-function initialize() {
+async function initialize() {
   // Create temp directory if it doesn't exist
   if (!fs.existsSync(tempDir)) {
     fs.mkdirSync(tempDir, { recursive: true });
@@ -442,35 +447,35 @@ function initialize() {
   setupIPCHandlers();
 
   // When app is ready
-  app.whenReady().then(() => {
-    try {
-      // Hide dock only if not configured to show
-      if (!store.get('showInDock', false)) {
-        app.dock.hide();
-      }
+  await app.whenReady();
 
-      // Create main window first
-      createMainWindow();
-
-      // Create tray icon
-      createTray();
-
-      // Register global shortcut
-      const shortcut = store.get('shortcut') || 'Command+Shift+Space';
-      globalShortcut.register(shortcut, toggleRecording);
-
-      // Handle app activation
-      app.on('activate', () => {
-        if (BrowserWindow.getAllWindows().length === 0) {
-          createMainWindow();
-        } else if (mainWindow && !mainWindow.isVisible()) {
-          mainWindow.show();
-        }
-      });
-    } catch (error) {
-      console.error('Error initializing app:', error);
+  try {
+    // Hide dock only if not configured to show
+    if (!store.get('showInDock', false)) {
+      app.dock.hide();
     }
-  });
+
+    // Create main window first
+    createMainWindow();
+
+    // Create tray icon
+    createTray();
+
+    // Register global shortcut
+    const shortcut = store.get('shortcut') || 'Command+Shift+Space';
+    globalShortcut.register(shortcut, toggleRecording);
+
+    // Handle app activation
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        createMainWindow();
+      } else if (mainWindow && !mainWindow.isVisible()) {
+        mainWindow.show();
+      }
+    });
+  } catch (error) {
+    console.error('Error initializing app:', error);
+  }
 
   // Handle dock show/hide events
   app.on('browser-window-focus', () => {
@@ -515,8 +520,10 @@ function createMainWindow() {
     width: 800,
     height: 600,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(__dirname, 'preload.mjs'),
       contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
     },
     show: false,
     skipTaskbar: false,
@@ -567,7 +574,6 @@ function createOverlayWindow() {
   closeOverlayWindow();
 
   // Get screen dimensions to center the overlay
-  const { screen } = require('electron');
   const primaryDisplay = screen.getPrimaryDisplay();
   const { width, height } = primaryDisplay.workAreaSize;
 
@@ -589,8 +595,10 @@ function createOverlayWindow() {
     vibrancy: null,
     visualEffectState: 'active',
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(__dirname, 'preload.mjs'),
       contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
       backgroundThrottling: false
     }
   });
@@ -638,5 +646,7 @@ function stopRecording() {
   }
 }
 
-// Start the app
-initialize();
+// Start the app using a top-level await
+(async () => {
+  await initialize();
+})();

@@ -2,6 +2,7 @@
   "name": "whisper-transcriber",
   "version": "1.0.0",
   "description": "Desktop app for audio transcription using Groq API and Whisper model",
+  "type": "module",
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
@@ -19,7 +20,8 @@
   },
   "dependencies": {
     "electron-store": "*",
-    "form-data": "*"
+    "form-data": "*",
+    "undici": "*"
   },
   "build": {
     "appId": "com.whispertranscriber.app",

@@ -5,7 +5,7 @@
  * through the contextBridge API, following the principle of least privilege.
  */
 
-const { contextBridge, ipcRenderer } = require('electron');
+import { contextBridge, ipcRenderer } from 'electron';
 
 /**
  * Create a safe API wrapper that exposes only necessary functions
