@@ -147,16 +147,26 @@ async function transcribeAudio(audioBuffer) {
     // Send to Groq API for transcription
     const rawTranscript = await sendToGroqAPI(apiKey, tempFile);
 
+    // If we get here and rawTranscript is empty, don't proceed
+    if (!rawTranscript?.trim()) {
+      updateTranscriptionProgress('error', 'No speech detected');
+      setTimeout(() => closeOverlayWindow(), 2000);
+      return;
+    }
+
     // Post-process with Groq if enabled
     updateTranscriptionProgress('processing', 'Post-processing transcript...');
     const processedTranscript = await postProcessTranscript(rawTranscript);
 
-    // Add to history
-    addToHistory(rawTranscript, processedTranscript);
-
-    // Copy processed version to clipboard
-    updateTranscriptionProgress('complete', 'Processing complete');
-    clipboard.writeText(processedTranscript);
+    // Add to history only if we have valid transcripts
+    if (processedTranscript?.trim()) {
+      addToHistory(rawTranscript, processedTranscript);
+      // Copy processed version to clipboard
+      updateTranscriptionProgress('complete', 'Processing complete');
+      clipboard.writeText(processedTranscript);
+    } else {
+      updateTranscriptionProgress('error', 'Failed to process transcript');
+    }
 
     // Close overlay after a delay
     setTimeout(() => closeOverlayWindow(), 1500);
@@ -164,7 +174,6 @@ async function transcribeAudio(audioBuffer) {
     return processedTranscript;
   } catch (error) {
     updateTranscriptionProgress('error', `Error: ${error.message}`);
-
     // Close overlay after a delay
     setTimeout(() => closeOverlayWindow(), 2000);
     throw error;
@@ -228,7 +237,14 @@ async function sendToGroqAPI(apiKey, audioFilePath) {
   }
 
   const result = JSON.parse(response.data);
-  return result.text;
+  const transcript = result.text?.trim();
+
+  // If no transcript or empty transcript, throw error
+  if (!transcript) {
+    throw new Error('No speech detected');
+  }
+
+  return transcript;
 }
 
 /**
