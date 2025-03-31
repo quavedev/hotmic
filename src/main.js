@@ -36,8 +36,68 @@ if (!fs.existsSync(tempDir)) {
   fs.mkdirSync(tempDir, { recursive: true });
 }
 
+// Define recordings directory for persistent storage
+const recordingsDir = path.join(app.getPath('userData'), 'recordings');
+if (!fs.existsSync(recordingsDir)) {
+  fs.mkdirSync(recordingsDir, { recursive: true });
+}
+
 // Default prompt for email formatting
 const DEFAULT_PROMPT = 'Please format this transcript as a professional email with a greeting and sign-off. Make it concise and clear while maintaining the key information.';
+
+/**
+ * Audio Processing
+ */
+// Create a properly formatted WAV file from raw audio data
+function formatWavFile(audioData) {
+  try {
+    console.log("Formatting audio data, size:", audioData.length);
+    
+    // Convert to Buffer if not already
+    const buffer = Buffer.isBuffer(audioData) ? audioData : Buffer.from(audioData);
+    
+    // Basic WAV parameters
+    const numChannels = 1; // Mono
+    const sampleRate = 44100; // 44.1kHz
+    const bitsPerSample = 16; // 16-bit
+    
+    // Calculate derived values
+    const bytesPerSample = bitsPerSample / 8;
+    const blockAlign = numChannels * bytesPerSample;
+    const byteRate = sampleRate * blockAlign;
+    const dataSize = buffer.length;
+    const fileSize = 36 + dataSize; // Total file size - 8
+    
+    // Create header buffer
+    const header = Buffer.alloc(44);
+    
+    // RIFF chunk descriptor
+    header.write('RIFF', 0);
+    header.writeUInt32LE(fileSize, 4);
+    header.write('WAVE', 8);
+    
+    // "fmt " sub-chunk
+    header.write('fmt ', 12);
+    header.writeUInt32LE(16, 16); // Subchunk1 size (16 bytes)
+    header.writeUInt16LE(1, 20); // AudioFormat: PCM = 1
+    header.writeUInt16LE(numChannels, 22);
+    header.writeUInt32LE(sampleRate, 24);
+    header.writeUInt32LE(byteRate, 28);
+    header.writeUInt16LE(blockAlign, 32);
+    header.writeUInt16LE(bitsPerSample, 34);
+    
+    // "data" sub-chunk
+    header.write('data', 36);
+    header.writeUInt32LE(dataSize, 40);
+    
+    // Combine header and audio data
+    return Buffer.concat([header, buffer]);
+  } catch (error) {
+    console.error('Error formatting WAV file:', error);
+    // Return original data if formatting fails
+    return audioData;
+  }
+}
 
 /**
  * Application State
@@ -55,15 +115,29 @@ function cleanupOldHistory() {
   const history = store.get('history', []);
   const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
   const newHistory = history.filter(item => item.timestamp > thirtyDaysAgo);
+  
+  // Delete audio files for removed history items
+  const removedItems = history.filter(item => item.timestamp <= thirtyDaysAgo);
+  removedItems.forEach(item => {
+    if (item.audioPath && fs.existsSync(item.audioPath)) {
+      try {
+        fs.unlinkSync(item.audioPath);
+      } catch (error) {
+        console.error('Error deleting old audio file:', error);
+      }
+    }
+  });
+  
   store.set('history', newHistory);
 }
 
-function addToHistory(rawText, processedText) {
+function addToHistory(rawText, processedText, audioPath) {
   const history = store.get('history', []);
   history.unshift({
     timestamp: Date.now(),
     rawText,
-    processedText
+    processedText,
+    audioPath
   });
   store.set('history', history);
 
@@ -73,6 +147,31 @@ function addToHistory(rawText, processedText) {
   }
 
   cleanupOldHistory();
+}
+
+// Update an existing history item with new transcript data
+function updateHistoryItem(audioPath, rawText, processedText) {
+  const history = store.get('history', []);
+  
+  // Find the item with the matching audio path
+  const index = history.findIndex(item => item.audioPath === audioPath);
+  
+  if (index !== -1) {
+    // Update the item with new transcripts but keep original timestamp
+    history[index].rawText = rawText;
+    history[index].processedText = processedText;
+    
+    store.set('history', history);
+    
+    // Notify renderer of history update
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('history-updated');
+    }
+    
+    return true;
+  }
+  
+  return false;
 }
 
 /**
@@ -135,24 +234,47 @@ async function postProcessTranscript(text) {
 /**
  * API and Transcription
  */
-async function transcribeAudio(audioBuffer) {
+async function transcribeAudio(audioBuffer, skipFormatting = false) {
   const apiKey = store.get('apiKey');
   if (!apiKey) {
     throw new Error('API key not set. Please configure in settings.');
   }
 
   let tempFile = null;
+  let savedAudioPath = null;
   try {
     updateTranscriptionProgress('start', 'Starting transcription...');
+    
+    console.log("Received audio buffer size:", audioBuffer.byteLength);
+
+    // Format the audio data into a proper WAV file
+    let wavBuffer;
+    try {
+      wavBuffer = formatWavFile(Buffer.from(audioBuffer));
+      console.log("WAV buffer created, size:", wavBuffer.length);
+    } catch (formatError) {
+      console.error("Error formatting WAV file:", formatError);
+      wavBuffer = Buffer.from(audioBuffer); // Use original data as fallback
+    }
 
     // Save audio to temp file
-    tempFile = path.join(tempDir, `recording-${Date.now()}.wav`);
-    fs.writeFileSync(tempFile, Buffer.from(audioBuffer));
+    const timestamp = Date.now();
+    tempFile = path.join(tempDir, `recording-${timestamp}.wav`);
+    fs.writeFileSync(tempFile, wavBuffer);
+    console.log("Temp file saved:", tempFile);
+
+    // Save a permanent copy only if this is a new recording
+    if (!skipFormatting) {
+      savedAudioPath = path.join(recordingsDir, `recording-${timestamp}.wav`);
+      fs.copyFileSync(tempFile, savedAudioPath);
+      console.log("Permanent copy saved:", savedAudioPath);
+    }
 
     updateTranscriptionProgress('api', 'Sending to Groq API...');
 
     // Send to Groq API for transcription
     const rawTranscript = await sendToGroqAPI(apiKey, tempFile);
+    console.log("Raw transcript received:", rawTranscript ? rawTranscript.substring(0, 50) + "..." : "None");
 
     // If we get here and rawTranscript is empty, don't proceed
     if (!rawTranscript?.trim()) {
@@ -165,10 +287,14 @@ async function transcribeAudio(audioBuffer) {
     updateTranscriptionProgress('processing', 'Post-processing transcript...');
     const processedTranscript = await postProcessTranscript(rawTranscript);
 
-    // Add to history only if we have valid transcripts
-    if (processedTranscript?.trim()) {
-      addToHistory(rawTranscript, processedTranscript);
+    // Add to history only if we have valid transcripts and this is a new recording
+    if (processedTranscript?.trim() && !skipFormatting && savedAudioPath) {
+      addToHistory(rawTranscript, processedTranscript, savedAudioPath);
       // Copy processed version to clipboard
+      updateTranscriptionProgress('complete', 'Processing complete');
+      clipboard.writeText(processedTranscript);
+    } else if (processedTranscript?.trim() && skipFormatting) {
+      // For retranscriptions, just update the display and copy to clipboard
       updateTranscriptionProgress('complete', 'Processing complete');
       clipboard.writeText(processedTranscript);
     } else {
@@ -180,98 +306,154 @@ async function transcribeAudio(audioBuffer) {
 
     return processedTranscript;
   } catch (error) {
+    console.error('Transcription error:', error);
     updateTranscriptionProgress('error', `Error: ${error.message}`);
     // Close overlay after a delay
     setTimeout(() => closeOverlayWindow(), 2000);
     throw error;
   } finally {
     // Clean up temp file
-    if (tempFile && fs.existsSync(tempFile)) {
-      fs.unlinkSync(tempFile);
+    try {
+      if (tempFile && fs.existsSync(tempFile)) {
+        fs.unlinkSync(tempFile);
+      }
+    } catch (e) {
+      console.error('Error cleaning up temp file:', e);
     }
   }
 }
 
 function updateTranscriptionProgress(step, message) {
+  console.log(`Transcription progress: ${step}${message ? ' - ' + message : ''}`);
+  
+  // Handle error step specially with more logging
+  if (step === 'error') {
+    console.error(`Transcription error: ${message}`);
+  }
+  
+  // Only send message if overlay window exists
   if (overlayWindow && !overlayWindow.isDestroyed()) {
-    overlayWindow.webContents.send('transcription-progress', { step, message });
+    try {
+      overlayWindow.webContents.send('transcription-progress', { step, message });
+    } catch (error) {
+      console.error("Error sending progress update to overlay:", error);
+    }
+  } else {
+    console.log("Cannot send progress update - overlay window not available");
   }
 }
 
 async function sendToGroqAPI(apiKey, audioFilePath) {
+  console.log("Sending audio file to Groq API:", audioFilePath);
+  
   // Create form data for API request
   const formData = new FormData();
-  formData.append('file', fs.createReadStream(audioFilePath));
+  const fileStream = fs.createReadStream(audioFilePath);
+  formData.append('file', fileStream);
   formData.append('model', 'whisper-large-v3');
+  
+  console.log("Form data created");
 
   // Send request to Groq API
-  const response = await new Promise((resolve, reject) => {
-    const formHeaders = formData.getHeaders();
-
-    const options = {
-      hostname: 'api.groq.com',
-      path: '/openai/v1/audio/transcriptions',
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        ...formHeaders
-      }
-    };
-
-    const req = https.request(options, (res) => {
-      let data = '';
-
-      res.on('data', (chunk) => {
-        data += chunk;
-        updateTranscriptionProgress('receiving', 'Receiving transcription...');
-      });
-
-      res.on('end', () => {
-        if (res.statusCode >= 200 && res.statusCode < 300) {
-          resolve({ ok: true, data });
-        } else {
-          console.error('API Error Response:', {
-            statusCode: res.statusCode,
-            data: data
-          });
-          resolve({ ok: false, statusCode: res.statusCode, data });
-        }
-      });
-    });
-
-    req.on('error', (error) => {
-      console.error('Request Error:', error);
-      reject(error);
-    });
-
-    formData.pipe(req);
-  });
-
-  if (!response.ok) {
-    console.error('API Error:', response.data);
-    throw new Error(`API error: ${response.data}`);
-  }
-
   try {
-    const result = JSON.parse(response.data);
-    console.log('API Response:', result);
+    const response = await new Promise((resolve, reject) => {
+      const formHeaders = formData.getHeaders();
+      
+      const options = {
+        hostname: 'api.groq.com',
+        path: '/openai/v1/audio/transcriptions',
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          ...formHeaders
+        }
+      };
+      
+      console.log("API request options created, sending request...");
+      
+      const req = https.request(options, (res) => {
+        let data = '';
+        
+        console.log(`API response status: ${res.statusCode}`);
 
-    if (!result || typeof result !== 'object') {
-      throw new Error('Invalid API response format');
+        res.on('data', (chunk) => {
+          data += chunk;
+          updateTranscriptionProgress('receiving', 'Receiving transcription...');
+        });
+
+        res.on('end', () => {
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            console.log("API request successful");
+            resolve({ ok: true, data });
+          } else {
+            console.error('API Error Response:', {
+              statusCode: res.statusCode,
+              data: data
+            });
+            resolve({ ok: false, statusCode: res.statusCode, data });
+          }
+        });
+      });
+
+      req.on('error', (error) => {
+        console.error('Request Error:', error);
+        reject(error);
+      });
+      
+      req.on('timeout', () => {
+        req.destroy();
+        reject(new Error('Request timed out'));
+      });
+      
+      req.setTimeout(30000); // 30 second timeout
+      
+      // Use a smaller timeout for pipe
+      fileStream.on('error', (error) => {
+        console.error('File stream error:', error);
+        reject(error);
+      });
+      
+      formData.pipe(req);
+    });
+
+    if (!response.ok) {
+      console.error('API Error:', response.data);
+      let errorMsg = 'API error';
+      
+      try {
+        const errorData = JSON.parse(response.data);
+        errorMsg = errorData.error?.message || errorData.error || 'API error';
+      } catch (e) {
+        errorMsg = `API error (${response.statusCode}): ${response.data.substring(0, 100)}`;
+      }
+      
+      throw new Error(errorMsg);
     }
 
-    const transcript = result.text?.trim();
-    console.log('Extracted transcript:', transcript);
+    try {
+      const result = JSON.parse(response.data);
+      console.log('API Response type:', typeof result);
 
-    // If no transcript or empty transcript, throw error
-    if (!transcript) {
-      throw new Error('No speech detected in audio');
+      if (!result || typeof result !== 'object') {
+        throw new Error('Invalid API response format');
+      }
+
+      const transcript = result.text?.trim();
+      console.log('Transcript length:', transcript?.length || 0);
+
+      // If no transcript or empty transcript, throw error
+      if (!transcript) {
+        throw new Error('No speech detected in audio');
+      }
+
+      return transcript;
+    } catch (error) {
+      console.error('Error processing API response:', error);
+      throw new Error(`Failed to process API response: ${error.message}`);
     }
-
-    return transcript;
   } catch (error) {
-    console.error('Error processing API response:', error);
-    throw new Error(`Failed to process API response: ${error.message}`);
+    console.error('API request failed:', error);
+    throw error;
   }
 }
 
@@ -459,6 +641,82 @@ function setupIPCHandlers() {
   ipcMain.handle('get-history', () => {
     cleanupOldHistory();
     return store.get('history', []);
+  });
+
+  // Get audio file for playback or download
+  ipcMain.handle('get-audio-file', (event, audioPath) => {
+    if (!audioPath || !fs.existsSync(audioPath)) {
+      return { success: false, error: 'Audio file not found' };
+    }
+    
+    try {
+      const buffer = fs.readFileSync(audioPath);
+      return { success: true, buffer };
+    } catch (error) {
+      console.error('Error reading audio file:', error);
+      return { success: false, error: error.message };
+    }
+  });
+  
+  // Save audio file to user-selected location
+  ipcMain.handle('save-audio-file', async (event, audioPath) => {
+    try {
+      if (!audioPath || !fs.existsSync(audioPath)) {
+        return { success: false, error: 'Audio file not found' };
+      }
+      
+      const { dialog } = await import('electron');
+      const { canceled, filePath } = await dialog.showSaveDialog({
+        title: 'Save Audio Recording',
+        defaultPath: path.basename(audioPath),
+        filters: [{ name: 'Audio Files', extensions: ['wav'] }]
+      });
+      
+      if (canceled || !filePath) {
+        return { success: false, canceled: true };
+      }
+      
+      fs.copyFileSync(audioPath, filePath);
+      return { success: true, savedPath: filePath };
+    } catch (error) {
+      console.error('Error saving audio file:', error);
+      return { success: false, error: error.message };
+    }
+  });
+  
+  // Re-transcribe an existing audio file
+  ipcMain.handle('retranscribe-audio', async (event, audioPath) => {
+    try {
+      if (!audioPath || !fs.existsSync(audioPath)) {
+        return { success: false, error: 'Audio file not found' };
+      }
+      
+      // Show overlay window
+      createOverlayWindow();
+      
+      // Tell overlay we're processing
+      if (overlayWindow && !overlayWindow.isDestroyed()) {
+        overlayWindow.webContents.send('transcription-progress', { 
+          step: 'start', 
+          message: 'Starting transcription...' 
+        });
+      }
+      
+      // Use transcribeAudio directly, but tell it to skip the formatting
+      // since this is already a properly formatted WAV file
+      const audioBuffer = fs.readFileSync(audioPath);
+      const transcription = await transcribeAudio(audioBuffer, true);
+      
+      // Update history item with new transcription
+      if (transcription) {
+        updateHistoryItem(audioPath, transcription, transcription);
+      }
+      
+      return { success: true, transcription };
+    } catch (error) {
+      console.error('Error retranscribing audio:', error);
+      return { success: false, error: error.message };
+    }
   });
 
   // Settings window management

@@ -25,6 +25,11 @@ contextBridge.exposeInMainWorld('api', {
   // Recording functionality
   sendAudioData: (buffer) => ipcRenderer.invoke('audio-data', buffer),
   sendAudioLevel: (level) => ipcRenderer.invoke('audio-level', level),
+  
+  // Audio file operations
+  getAudioFile: (path) => ipcRenderer.invoke('get-audio-file', path),
+  saveAudioFile: (path) => ipcRenderer.invoke('save-audio-file', path),
+  retranscribeAudio: (path) => ipcRenderer.invoke('retranscribe-audio', path),
 
   // Event listeners (with proper cleanup)
   onStartRecording: (callback) => {

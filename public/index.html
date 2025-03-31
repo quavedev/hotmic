@@ -534,6 +534,46 @@
       cursor: not-allowed;
       pointer-events: none;
     }
+    
+    /* Audio player section */
+    .audio-section {
+      margin-top: var(--spacing-md);
+    }
+    
+    .audio-player-container {
+      padding: var(--spacing-sm);
+      background: var(--form-group-background);
+      border: 1px solid var(--control-border);
+      border-radius: var(--radius-md);
+      margin-bottom: var(--spacing-md);
+    }
+    
+    .audio-player {
+      width: 100%;
+      height: 40px;
+    }
+    
+    .audio-actions {
+      display: flex;
+      gap: var(--spacing-sm);
+      margin-top: var(--spacing-sm);
+    }
+    
+    .audio-actions button {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    
+    .audio-actions .icon {
+      font-size: 14px;
+    }
+    
+    .status-message {
+      margin-top: var(--spacing-xs);
+      font-size: 12px;
+      color: var(--secondary-text);
+    }
   </style>
 </head>
 
@@ -863,8 +903,9 @@
 
       const processedText = item.processedText || 'Processing failed';
       const canCopyProcessed = item.processedText && item.processedText !== 'Processing failed';
+      const hasAudio = item.audioPath ? true : false;
 
-      detailView.innerHTML = `
+      let content = `
         <div class="content">
           <div class="transcript-section">
             <h3>Processed Transcript</h3>
@@ -884,9 +925,118 @@
             <div class="transcript-actions">
               <button onclick="copyToClipboard(this, '${encodeURIComponent(item.rawText)}')" class="button-success">Copy Raw</button>
             </div>
-          </div>
-        </div>
-      `;
+          </div>`;
+
+      if (hasAudio) {
+        content += `
+          <div class="transcript-section audio-section">
+            <h3>Audio Recording</h3>
+            <div class="audio-player-container">
+              <audio id="audioPlayer" class="audio-player" controls></audio>
+              <div id="audioStatus" class="status-message"></div>
+            </div>
+            <div class="audio-actions">
+              <button onclick="downloadAudio('${item.audioPath}')">
+                <span class="icon">⬇️</span> Download Audio
+              </button>
+              <button onclick="retranscribeAudio('${item.audioPath}')">
+                <span class="icon">🔄</span> Re-Transcribe
+              </button>
+            </div>
+          </div>`;
+      }
+
+      content += `</div>`;
+      detailView.innerHTML = content;
+
+      // Load audio if available
+      if (hasAudio) {
+        loadAudio(item.audioPath);
+      }
+    }
+
+    // Load audio file for playback
+    async function loadAudio(audioPath) {
+      try {
+        const result = await window.api.getAudioFile(audioPath);
+        if (result.success) {
+          const audioPlayer = document.getElementById('audioPlayer');
+          const blob = new Blob([result.buffer], { type: 'audio/wav' });
+          const url = URL.createObjectURL(blob);
+          audioPlayer.src = url;
+          
+          // Clean up the URL when audio is no longer needed
+          audioPlayer.onended = () => {
+            URL.revokeObjectURL(url);
+          };
+          
+          // Also clean up when the player is destroyed
+          window.addEventListener('beforeunload', () => {
+            URL.revokeObjectURL(url);
+          });
+        } else {
+          const audioStatus = document.getElementById('audioStatus');
+          audioStatus.textContent = result.error || 'Failed to load audio';
+          audioStatus.style.color = 'var(--system-red)';
+        }
+      } catch (error) {
+        console.error('Error loading audio:', error);
+        const audioStatus = document.getElementById('audioStatus');
+        audioStatus.textContent = error.message || 'Failed to load audio';
+        audioStatus.style.color = 'var(--system-red)';
+      }
+    }
+
+    // Download audio file
+    async function downloadAudio(audioPath) {
+      try {
+        const result = await window.api.saveAudioFile(audioPath);
+        if (result.success) {
+          const audioStatus = document.getElementById('audioStatus');
+          audioStatus.textContent = 'Audio file saved successfully';
+          audioStatus.style.color = 'var(--system-green)';
+          
+          // Clear status after 3 seconds
+          setTimeout(() => {
+            audioStatus.textContent = '';
+          }, 3000);
+        } else if (!result.canceled) {
+          const audioStatus = document.getElementById('audioStatus');
+          audioStatus.textContent = result.error || 'Failed to save audio file';
+          audioStatus.style.color = 'var(--system-red)';
+        }
+      } catch (error) {
+        console.error('Error saving audio:', error);
+        const audioStatus = document.getElementById('audioStatus');
+        audioStatus.textContent = error.message || 'Failed to save audio file';
+        audioStatus.style.color = 'var(--system-red)';
+      }
+    }
+
+    // Re-transcribe audio
+    async function retranscribeAudio(audioPath) {
+      try {
+        const audioStatus = document.getElementById('audioStatus');
+        audioStatus.textContent = 'Sending for transcription...';
+        audioStatus.style.color = 'var(--text)';
+        
+        const result = await window.api.retranscribeAudio(audioPath);
+        if (result.success) {
+          audioStatus.textContent = 'Transcription completed successfully';
+          audioStatus.style.color = 'var(--system-green)';
+          
+          // Reload history to show new transcription
+          await loadHistory();
+        } else {
+          audioStatus.textContent = result.error || 'Failed to transcribe audio';
+          audioStatus.style.color = 'var(--system-red)';
+        }
+      } catch (error) {
+        console.error('Error retranscribing audio:', error);
+        const audioStatus = document.getElementById('audioStatus');
+        audioStatus.textContent = error.message || 'Failed to transcribe audio';
+        audioStatus.style.color = 'var(--system-red)';
+      }
     }
 
     // Load and display history

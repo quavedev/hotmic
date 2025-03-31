@@ -521,18 +521,55 @@
         state.recordingInterval = setInterval(updateTimeDisplay, 1000);
         updateTimeDisplay();
 
-        // Get audio stream
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        // Get audio stream with basic audio settings
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          audio: true
+        });
 
         // Setup audio context for level monitoring
         setupAudioAnalyzer(stream);
 
-        // Setup media recorder
-        setupMediaRecorder(stream);
+        // Setup and start media recorder with basic settings
+        state.mediaRecorder = new MediaRecorder(stream);
+        
+        state.mediaRecorder.ondataavailable = (event) => {
+          if (event.data.size > 0) {
+            state.audioData.push(event.data);
+          }
+        };
 
-        // Start recording
-        state.mediaRecorder.start();
+        state.mediaRecorder.onstop = async () => {
+          // If cancelled, don't process the audio
+          if (state.isCancelled) {
+            // Clean up
+            stream.getTracks().forEach(track => track.stop());
+            return;
+          }
+
+          try {
+            // Convert to blob then to array buffer
+            const blob = new Blob(state.audioData);
+            const arrayBuffer = await blob.arrayBuffer();
+
+            // Clean up
+            stream.getTracks().forEach(track => track.stop());
+
+            // Show processing UI
+            setProcessingUI();
+
+            // Send to main process
+            window.api.sendAudioData(arrayBuffer);
+          } catch (err) {
+            console.error("Error processing audio data:", err);
+            elements.statusMessage.textContent = `Error: ${err.message}`;
+          }
+        };
+        
+        // Start recording immediately with data available every 1 second
+        state.mediaRecorder.start(1000);
+        
       } catch (error) {
+        console.error('Recording error:', error);
         elements.statusMessage.textContent = `Error: ${error.message}`;
       }
     }
@@ -548,39 +585,6 @@
 
       // Start monitoring audio levels
       monitorAudioLevel();
-    }
-
-    // Set up media recorder
-    function setupMediaRecorder(stream) {
-      state.mediaRecorder = new MediaRecorder(stream);
-
-      state.mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          state.audioData.push(event.data);
-        }
-      };
-
-      state.mediaRecorder.onstop = async () => {
-        // If cancelled, don't process the audio
-        if (state.isCancelled) {
-          // Clean up
-          stream.getTracks().forEach(track => track.stop());
-          return;
-        }
-
-        // Convert to blob then to array buffer
-        const blob = new Blob(state.audioData, { type: 'audio/wav' });
-        const arrayBuffer = await blob.arrayBuffer();
-
-        // Clean up
-        stream.getTracks().forEach(track => track.stop());
-
-        // Show processing UI
-        setProcessingUI();
-
-        // Send to main process
-        window.api.sendAudioData(arrayBuffer);
-      };
     }
 
     // Stop recording
