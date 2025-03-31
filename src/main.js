@@ -631,10 +631,10 @@ function createOverlayWindow() {
   const { width, height } = primaryDisplay.workAreaSize;
 
   overlayWindow = new BrowserWindow({
-    width: 340,
-    height: 340,
-    x: Math.floor(width / 2 - 150),
-    y: Math.floor(height / 2 - 150),
+    width: 190,
+    height: 190,
+    x: Math.floor(width / 2 - 95),
+    y: Math.floor(height / 2 - 95),
     frame: false,
     transparent: true,
     backgroundColor: '#00000000',
@@ -644,7 +644,7 @@ function createOverlayWindow() {
     skipTaskbar: true,
     alwaysOnTop: true,
     show: false,
-    frame: false,
+    movable: true,
     vibrancy: null,
     visualEffectState: 'active',
     webPreferences: {

@@ -17,12 +17,13 @@
       align-items: center;
       height: 100vh;
       width: 100vw;
+      overflow: hidden; /* Prevent scrolling */
     }
 
     /* Main container */
     .overlay-container {
-      width: 220px;
-      height: 220px;
+      width: 170px;
+      height: 170px;
       position: absolute;
       top: 50%;
       left: 50%;
@@ -33,25 +34,27 @@
       align-items: center;
       color: white;
       text-align: center;
+      -webkit-app-region: drag; /* Make draggable */
+      cursor: move; /* Show move cursor */
+      overflow: hidden; /* Prevent content from spilling out */
     }
 
-    /* Blob background */
+    /* Square background */
     .blob-background {
       position: absolute;
       top: 0;
       left: 0;
       width: 100%;
       height: 100%;
-      border-radius: 50%;
-      background: rgba(0, 0, 0, 0.5);
+      border-radius: 8px; /* Slight rounding on corners */
+      background: rgba(0, 0, 0, 0.7);
       backdrop-filter: blur(5px);
       -webkit-backdrop-filter: blur(5px);
       z-index: -1;
       transform-origin: center;
       transition: transform 0.2s ease-out;
-      box-shadow: none;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
       border: none;
-      overflow: hidden;
     }
 
     /* Reactive blob */
@@ -92,8 +95,8 @@
       position: absolute;
       top: 50%;
       left: 50%;
-      width: 340px;
-      height: 340px;
+      width: 240px;
+      height: 240px;
       transform: translate(-50%, -50%);
       overflow: visible;
       z-index: -1;
@@ -101,8 +104,8 @@
 
     .particle {
       position: absolute;
-      width: 4px;
-      height: 4px;
+      width: 3px;
+      height: 3px;
       border-radius: 50%;
       background-color: rgba(255, 255, 255, 0.3);
       animation: float 3s infinite linear;
@@ -110,11 +113,11 @@
 
     /* Recording indicator */
     .recording-indicator {
-      width: 12px;
-      height: 12px;
+      width: 10px;
+      height: 10px;
       border-radius: 50%;
       background-color: #ff3b30;
-      margin-bottom: 10px;
+      margin-bottom: 8px;
       position: relative;
       z-index: 2;
     }
@@ -122,10 +125,10 @@
     .recording-indicator::before {
       content: '';
       position: absolute;
-      top: -4px;
-      left: -4px;
-      right: -4px;
-      bottom: -4px;
+      top: -3px;
+      left: -3px;
+      right: -3px;
+      bottom: -3px;
       background-color: rgba(255, 59, 48, 0.4);
       border-radius: 50%;
       animation: pulse 1.5s infinite;
@@ -134,17 +137,17 @@
 
     /* Audio level visualization */
     .audio-visualizer {
-      width: 160px;
-      height: 40px;
-      margin: 10px 0;
+      width: 120px;
+      height: 30px;
+      margin: 8px 0;
       display: flex;
       justify-content: space-between;
       align-items: flex-end;
     }
 
     .audio-bar {
-      width: 3px;
-      height: 5px;
+      width: 2px;
+      height: 3px;
       background-color: rgba(64, 224, 208, 0.7);
       border-radius: 1px;
       transition: height 0.1s ease-out;
@@ -152,29 +155,29 @@
 
     /* Status text */
     .status-message {
-      font-size: 14px;
-      margin: 5px 0;
-      height: 20px;
+      font-size: 12px;
+      margin: 4px 0;
+      height: 16px;
       opacity: 0.9;
       text-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
     }
 
     /* Timer display */
     .time-display {
-      font-size: 28px;
+      font-size: 24px;
       font-weight: 300;
-      margin: 8px 0;
+      margin: 6px 0;
       text-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
       letter-spacing: 1px;
     }
 
     /* Progress bar for transcription */
     .progress-container {
-      width: 160px;
-      height: 4px;
+      width: 120px;
+      height: 3px;
       background-color: rgba(255, 255, 255, 0.1);
-      border-radius: 2px;
-      margin: 10px 0;
+      border-radius: 1.5px;
+      margin: 8px 0;
       display: none;
       overflow: hidden;
       position: relative;
@@ -184,7 +187,7 @@
       height: 100%;
       width: 0%;
       background: linear-gradient(90deg, #40E0D0, #7F00FF);
-      border-radius: 2px;
+      border-radius: 1.5px;
       transition: width 0.3s ease;
     }
 
@@ -192,7 +195,7 @@
       position: absolute;
       top: 0;
       left: 0;
-      width: 30px;
+      width: 20px;
       height: 100%;
       background: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.5) 50%, rgba(255, 255, 255, 0) 100%);
       animation: progressGlow 2s infinite linear;
@@ -202,20 +205,48 @@
     /* Spinner */
     .spinner {
       display: none;
-      width: 24px;
-      height: 24px;
+      width: 20px;
+      height: 20px;
       border: 2px solid rgba(255, 255, 255, 0.1);
       border-radius: 50%;
       border-top-color: rgba(64, 224, 208, 0.7);
       animation: spin 1s linear infinite;
-      margin-bottom: 10px;
+      margin-bottom: 8px;
     }
 
     /* Transcription icon */
     .transcription-icon {
-      font-size: 24px;
-      margin-bottom: 10px;
+      font-size: 20px;
+      margin-bottom: 8px;
       display: none;
+    }
+
+    /* Control buttons */
+    .controls {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      z-index: 10;
+      -webkit-app-region: no-drag; /* Make buttons not draggable */
+    }
+
+    .control-button {
+      width: 16px;
+      height: 16px;
+      border-radius: 4px;
+      background-color: rgba(255, 255, 255, 0.2);
+      color: white;
+      font-size: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      margin-bottom: 5px;
+      transition: background-color 0.2s;
+    }
+
+    .control-button:hover {
+      background-color: rgba(255, 255, 255, 0.4);
     }
 
     /* Animations */
@@ -269,7 +300,7 @@
       }
 
       100% {
-        transform: translateX(160px);
+        transform: translateX(120px);
       }
     }
 
@@ -284,7 +315,7 @@
       }
 
       100% {
-        transform: translateY(-40px) translateX(10px);
+        transform: translateY(-30px) translateX(8px);
         opacity: 0;
       }
     }
@@ -311,12 +342,12 @@
     @keyframes processingPulse {
       0% {
         transform: scale(1);
-        background: rgba(0, 0, 0, 0.5);
+        background: rgba(0, 0, 0, 0.7);
       }
 
       100% {
-        transform: scale(1.05);
-        background: rgba(30, 30, 60, 0.5);
+        transform: scale(1.02);
+        background: rgba(30, 30, 60, 0.7);
       }
     }
   </style>
@@ -324,11 +355,13 @@
 
 <body>
   <div class="overlay-container">
-    <!-- Dynamic background elements -->
+    <!-- Square background -->
     <div class="blob-background"></div>
-    <div class="reactive-blob"></div>
-    <div class="outer-glow"></div>
-    <div class="particles" id="particles"></div>
+
+    <!-- Control buttons -->
+    <div class="controls">
+      <div class="control-button" id="closeButton">✕</div>
+    </div>
 
     <!-- Visual elements -->
     <div class="recording-indicator"></div>
@@ -360,7 +393,6 @@
     const elements = {
       container: document.querySelector('.overlay-container'),
       blobBackground: document.querySelector('.blob-background'),
-      reactiveBlob: document.querySelector('.reactive-blob'),
       recordingIndicator: document.querySelector('.recording-indicator'),
       statusMessage: document.querySelector('.status-message'),
       timeDisplay: document.querySelector('.time-display'),
@@ -369,7 +401,6 @@
       progressGlow: document.querySelector('.progress-glow'),
       spinner: document.querySelector('.spinner'),
       transcriptionIcon: document.querySelector('.transcription-icon'),
-      particles: document.querySelector('#particles'),
       audioVisualizer: document.getElementById('audioVisualizer')
     };
 
@@ -400,37 +431,6 @@
         bar.className = 'audio-bar';
         elements.audioVisualizer.appendChild(bar);
         state.audioBars.push(bar);
-      }
-    }
-
-    // Create floating particles
-    function createParticles() {
-      // Create 15 particles
-      for (let i = 0; i < 15; i++) {
-        const particle = document.createElement('div');
-        particle.className = 'particle';
-
-        // Random positions
-        const size = Math.random() * 3 + 2;
-        particle.style.width = `${size}px`;
-        particle.style.height = `${size}px`;
-        particle.style.opacity = Math.random() * 0.5;
-
-        // Random starting positions relative to center
-        const angle = Math.random() * Math.PI * 2;
-        const distance = Math.random() * 120 + 40;
-        const x = Math.cos(angle) * distance;
-        const y = Math.sin(angle) * distance;
-
-        // Position from center (particles container is centered with transform)
-        particle.style.left = `calc(50% + ${x}px)`;
-        particle.style.top = `calc(50% + ${y}px)`;
-
-        // Random animations
-        particle.style.animationDelay = `${Math.random() * 3}s`;
-        particle.style.animationDuration = `${Math.random() * 3 + 2}s`;
-
-        elements.particles.appendChild(particle);
       }
     }
 
@@ -481,17 +481,10 @@
       }
     }
 
-    // Update blob based on audio level
-    function updateBlob(level) {
-      const scaleFactor = 1 + level * 0.3;
-      elements.reactiveBlob.style.transform = `scale(${scaleFactor})`;
-
-      // Make blob glow brighter with louder audio
-      const opacity = 0.3 + level * 0.4;
-      elements.reactiveBlob.style.background = `radial-gradient(circle at center,
-                          rgba(75, 0, 130, ${opacity}) 0%,
-                          rgba(0, 180, 216, ${opacity * 0.7}) 50%,
-                          rgba(0, 0, 0, 0) 70%)`;
+    // Update visual effects based on audio level
+    function updateVisualEffects(level) {
+      const scaleFactor = 1 + level * 0.05;
+      elements.blobBackground.style.transform = `scale(${scaleFactor})`;
     }
 
     // Monitor and display audio levels
@@ -504,7 +497,7 @@
 
       // Update UI
       updateAudioVisualizer(state.dataArray);
-      updateBlob(level);
+      updateVisualEffects(level);
 
       // Send to main process
       window.api.sendAudioLevel(level);
@@ -686,7 +679,7 @@
         }
 
         updateAudioVisualizer(fakeData);
-        updateBlob(level);
+        updateVisualEffects(level);
       }
     }
 
@@ -725,13 +718,34 @@
     // Initialize the UI
     function initializeUI() {
       createAudioVisualizer();
-      createParticles();
     }
 
     // Initialize when DOM is loaded
     document.addEventListener('DOMContentLoaded', () => {
       initializeUI();
       registerEventListeners();
+      
+      // Add close button functionality
+      document.getElementById('closeButton').addEventListener('click', () => {
+        if (state.isRecording) {
+          state.isCancelled = true;
+          stopRecording();
+          // Clean up audio context and recorder
+          if (state.audioContext) {
+            state.audioContext.close();
+            state.audioContext = null;
+            state.analyser = null;
+          }
+          if (state.mediaRecorder && state.mediaRecorder.state !== 'inactive') {
+            state.mediaRecorder.stop();
+          }
+          // Reset state
+          state.isRecording = false;
+          state.audioData = [];
+          clearInterval(state.recordingInterval);
+        }
+        window.api.openSettings();
+      });
     });
 
     // Add keyboard shortcut listener
